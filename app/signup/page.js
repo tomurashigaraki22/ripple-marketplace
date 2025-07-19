@@ -2,10 +2,12 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const router = useRouter()
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -124,6 +126,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
+              onClick={() => router.push("/marketplace")}
               className="w-full py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all"
             >
               Create Account

@@ -210,11 +210,15 @@ const products = [
             <Link key={product.id} href={`/marketplace/${product.id}`}>
               <div className="card-glow rounded-lg overflow-hidden hover:neon-glow transition-all cursor-pointer">
                 <div className="relative">
-                  <Image
-                    src={product.image}
-                    alt={product.title}
-                    className="w-full h-64 object-cover"
-                  />
+
+<Image
+  src={product.image}
+  alt={product.title}
+  width={500} // required, but can be any pixel value — won't matter with className
+  height={256} // or approximate height in px (h-64 = 16rem = 256px)
+  className="w-full h-64 object-cover"
+/>
+
                   <div className="absolute top-4 left-4">
                     <span className="px-2 py-1 bg-black/80 rounded-full text-sm">{getChainIcon(product.chain)}</span>
                   </div>

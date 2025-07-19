@@ -6,7 +6,13 @@ const nextConfig = {
       'lh3.googleusercontent.com', // Common NFT CDN
       'ipfs.io',            // IPFS links
       'cdn.mintbase.xyz',   // Mintbase, if needed
-      'arweave.net'         // Arweave-hosted NFTs
+      'arweave.net',
+      'airnfts.s3.amazonaws.com',
+      'img-cdn.magiceden.dev',
+      'learn.mudrex.com',
+      'static01.nyt.com',
+      'miro.medium.com',
+      'encrypted-tbn0.gstatic.com',
     ],
   },
   eslint: {

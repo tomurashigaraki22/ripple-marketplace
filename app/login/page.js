@@ -2,6 +2,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -9,6 +10,7 @@ export default function LoginPage() {
     email: "",
     password: "",
   })
+  const router = useRouter()
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -80,6 +82,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
+              onClick={() => router.push("/marketplace")}
               className="w-full py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all"
             >
               Sign In

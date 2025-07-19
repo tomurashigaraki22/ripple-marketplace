@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Twitter, Github, TextIcon as Telegram, DiscIcon as Discord } from "lucide-react"
 import Image from "next/image"
+import Logo from "../../public/logo.jpg"
 
 export default function Footer() {
   return (
@@ -11,7 +12,7 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 rounded-full flex items-center justify-center">
-                <Image src={require("../../public/logo.jpg")} alt="RippleBids Logo"/>
+                <Image src={Logo} alt="RippleBids Logo"/>
               </div>
               <span className="text-xl font-bold neon-text">RippleBids</span>
             </div>
