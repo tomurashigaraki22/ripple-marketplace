@@ -8,7 +8,7 @@ export default function HomePage() {
       <section className="relative py-20 px-4 sm:px-6 lg:px-8 gradient-bg">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            <span className="neon-text">Claim Your XRPB Tokens</span>
+            <span className="neon-text">Welcome To RippleBids MarketPlace</span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
             Join the future of decentralized commerce on XRP Ledger, EVM chains, and Solana
