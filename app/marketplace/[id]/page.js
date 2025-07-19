@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useParams } from "next/navigation"
 import { Heart, Share2, Flag, Clock, Users } from "lucide-react"
+import Image from "next/image"
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -82,7 +83,7 @@ export default function ProductDetailPage() {
           {/* Image Section */}
           <div className="space-y-6">
             <div className="card-glow rounded-lg overflow-hidden">
-              <img
+              <Image
                 src={product.image || "/placeholder.svg"}
                 alt={product.title}
                 className="w-full aspect-square object-cover"

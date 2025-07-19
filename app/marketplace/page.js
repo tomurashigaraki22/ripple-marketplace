@@ -2,6 +2,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Search, Grid, List } from "lucide-react"
+import Image from "next/image"
 
 export default function MarketplacePage() {
   const [viewMode, setViewMode] = useState("grid")
@@ -209,7 +210,7 @@ const products = [
             <Link key={product.id} href={`/marketplace/${product.id}`}>
               <div className="card-glow rounded-lg overflow-hidden hover:neon-glow transition-all cursor-pointer">
                 <div className="relative">
-                  <img
+                  <Image
                     src={product.image}
                     alt={product.title}
                     className="w-full h-64 object-cover"
