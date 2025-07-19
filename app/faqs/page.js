@@ -35,7 +35,7 @@ export default function FAQsPage() {
         {
           question: "What is XRPB token?",
           answer:
-            "XRPB is the native utility token of RippleBids. It's used for purchases, membership rewards, staking access, and unlocking premium features across the platform.",
+            "XRPB is the native utility token of RippleBids. It&rsquo;s used for purchases, membership rewards, staking access, and unlocking premium features across the platform.",
         },
         {
           question: "How can I get XRPB tokens?",
@@ -66,7 +66,7 @@ export default function FAQsPage() {
         {
           question: "Can I cancel a bid?",
           answer:
-            "Bids cannot be cancelled once placed, as they are recorded on the blockchain. Make sure you're comfortable with your bid amount before confirming.",
+            "Bids cannot be cancelled once placed, as they are recorded on the blockchain. Make sure you&rsquo;re comfortable with your bid amount before confirming.",
         },
       ],
     },
@@ -87,7 +87,7 @@ export default function FAQsPage() {
         {
           question: "Can I downgrade my membership?",
           answer:
-            "Yes, you can downgrade at any time. Changes take effect at the end of your current billing cycle, and you'll retain benefits until then.",
+            "Yes, you can downgrade at any time. Changes take effect at the end of your current billing cycle, and you&rsquo;ll retain benefits until then.",
         },
       ],
     },
@@ -187,7 +187,7 @@ export default function FAQsPage() {
         {/* Contact Support */}
         <div className="card-glow p-8 rounded-lg mt-12 text-center">
           <h3 className="text-2xl font-bold mb-4">Still Need Help?</h3>
-          <p className="text-gray-300 mb-6">Can't find what you're looking for? Our support team is here to help.</p>
+          <p className="text-gray-300 mb-6">Can&rsquo;t find what you&rsquo;re looking for? Our support team is here to help.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button className="px-6 py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all">
               Contact Support
