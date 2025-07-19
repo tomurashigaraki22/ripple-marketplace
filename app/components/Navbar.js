@@ -10,13 +10,19 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-black/90 backdrop-blur-md border-b border-[#39FF14]/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Top Bar */}
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
+          {/* Logo & Brand (always left) */}
           <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center">
-                <Image src={require("../../public/logo.jpg")} alt="RippleBids Logo"/>
-              </div>
-            <span className="text-xl font-bold neon-text">RippleBids</span>
+            <div className="w-8 h-8 rounded-full overflow-hidden">
+              <Image
+                src={require("../../public/logo.jpg")}
+                alt="RippleBids Logo"
+                width={32}
+                height={32}
+              />
+            </div>
+            <span className="text-xl font-bold neon-text text-white">RippleBids</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -52,45 +58,57 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Mobile menu button */}
-          <button onClick={() => setIsOpen(!isOpen)} className="md:hidden p-2">
+          {/* Mobile menu button (always right) */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden text-white p-2 ml-auto"
+            aria-label="Toggle menu"
+          >
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
-        {/* Mobile Navigation */}
-        {isOpen && (
-          <div className="md:hidden py-4 space-y-4">
-            <Link href="/marketplace" className="block hover:text-[#39FF14] transition-colors">
-              Marketplace
+        {/* Mobile Dropdown Menu */}
+        <div
+          className={`md:hidden transition-all duration-300 ease-in-out overflow-hidden ${
+            isOpen ? "max-h-screen py-4 space-y-4" : "max-h-0"
+          }`}
+        >
+          <Link href="/marketplace" className="block hover:text-[#39FF14] transition-colors">
+            Marketplace
+          </Link>
+          <Link href="/membership" className="block hover:text-[#39FF14] transition-colors">
+            Membership
+          </Link>
+          <Link href="/portal" className="block hover:text-[#39FF14] transition-colors">
+            My Portal
+          </Link>
+          <Link href="/faqs" className="block hover:text-[#39FF14] transition-colors">
+            FAQs
+          </Link>
+          <div className="pt-4 space-y-2">
+            <Link
+              href="/wallet"
+              className="block w-full text-center px-4 py-2 neon-border rounded-lg"
+            >
+              Connect Wallet
             </Link>
-            <Link href="/membership" className="block hover:text-[#39FF14] transition-colors">
-              Membership
+            <Link
+              href="/login"
+              className="block w-full text-center px-4 py-2 bg-[#39FF14] text-black rounded-lg"
+            >
+              Login
             </Link>
-            <Link href="/portal" className="block hover:text-[#39FF14] transition-colors">
-              My Portal
-            </Link>
-            <Link href="/faqs" className="block hover:text-[#39FF14] transition-colors">
-              FAQs
-            </Link>
-            <div className="pt-4 space-y-2">
-              <Link href="/wallet" className="block w-full text-center px-4 py-2 neon-border rounded-lg">
-                Connect Wallet
-              </Link>
-              <Link href="/login" className="block w-full text-center px-4 py-2 bg-[#39FF14] text-black rounded-lg">
-                Login
-              </Link>
-            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-md border-t border-[#39FF14]/20 px-4 py-2">
-        <div className="flex justify-around items-center">
+        <div className="flex justify-around items-center text-white">
           <Link href="/marketplace" className="flex flex-col items-center space-y-1 p-2">
             <ShoppingBag className="w-5 h-5" />
-            <span className="text-xs">Marketplace</span>
+            <span className="text-xs">Market</span>
           </Link>
           <Link href="/wallet" className="flex flex-col items-center space-y-1 p-2">
             <Wallet className="w-5 h-5" />
@@ -101,7 +119,7 @@ export default function Navbar() {
             <span className="text-xs">Portal</span>
           </Link>
         </div>
-      </div>
+      </div> */}
     </nav>
   )
 }
