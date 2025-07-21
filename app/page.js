@@ -4,7 +4,6 @@ import { ArrowRight, Zap, Shield, Globe, Coins } from "lucide-react"
 export default function HomePage() {
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
       <section className="relative py-20 px-4 sm:px-6 lg:px-8 gradient-bg">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6">

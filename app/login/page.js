@@ -1,8 +1,9 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "../context/AuthContext"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -10,17 +11,49 @@ export default function LoginPage() {
     email: "",
     password: "",
   })
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { login } = useAuth()
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    if (searchParams.get("registered")) {
+      setSuccess("Registration successful! Please log in.")
+    }
+  }, [])
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Mock login logic
-    console.log("Login attempt:", formData)
-    alert("Login successful! (Mock)")
+    setError("")
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed")
+      }
+
+      // Use AuthContext login to save token and user info
+      login(data.token, data.user || null)
+
+      // Redirect to marketplace
+      router.push("/marketplace")
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
-  const handleWalletLogin = (walletType) => {
-    alert(`Connecting to ${walletType}... (Mock)`)
+  const handleWalletLogin = async (walletType) => {
+    alert(`Connecting to ${walletType}... (Coming soon)`)
   }
 
   return (
@@ -30,6 +63,18 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
           <p className="text-gray-400">Sign in to your RippleBids account</p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-500/10 border border-green-500 rounded-lg text-green-500">
+            {success}
+          </div>
+        )}
 
         <div className="card-glow p-8 rounded-lg">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -82,7 +127,6 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              onClick={() => router.push("/marketplace")}
               className="w-full py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all"
             >
               Sign In

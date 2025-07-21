@@ -14,16 +14,41 @@ export default function SignupPage() {
     password: "",
     confirmPassword: "",
   })
+  const [error, setError] = useState("")
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError("")
+
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!")
+      setError("Passwords do not match!")
       return
     }
-    // Mock signup logic
-    console.log("Signup attempt:", formData)
-    alert("Account created successfully! (Mock)")
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
+      console.log("Response: ", response)
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Registration failed")
+      }
+
+      router.push("/login?registered=true")
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (
@@ -33,6 +58,12 @@ export default function SignupPage() {
           <h1 className="text-3xl font-bold mb-2">Create Account</h1>
           <p className="text-gray-400">Join RippleBids and start trading</p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
+            {error}
+          </div>
+        )}
 
         <div className="card-glow p-8 rounded-lg">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -126,7 +157,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              onClick={() => router.push("/marketplace")}
+              onClick={handleSubmit}
               className="w-full py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all"
             >
               Create Account

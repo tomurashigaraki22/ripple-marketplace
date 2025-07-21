@@ -1,13 +1,15 @@
 "use client"
 import { useState } from "react"
 import { useParams } from "next/navigation"
-import { Heart, Share2, Flag, Clock, Users } from "lucide-react"
 import Image from "next/image"
+import { Heart, Share2, Flag, Clock, Users, Truck, Package } from "lucide-react"
 
 export default function ProductDetailPage() {
-  const params = useParams()
   const [bidAmount, setBidAmount] = useState("")
+  const [shippingCountry, setShippingCountry] = useState("")
+  const [shippingMethod, setShippingMethod] = useState("")
   const [isLiked, setIsLiked] = useState(false)
+  const params = useParams()
 
   // Mock product data - in real app, fetch based on params.id
   const product = {
@@ -20,6 +22,9 @@ export default function ProductDetailPage() {
     buyNowPrice: 200,
     chain: "xrp",
     category: "Digital Art",
+    isPhysical: true, // Added isPhysical property
+    weight: 0, // Weight in kg (for physical items)
+    dimensions: { length: 0, width: 0, height: 0 }, // Dimensions in cm (for physical items)
     owner: {
       address: "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH",
       username: "CosmicArtist",
@@ -76,19 +81,59 @@ export default function ProductDetailPage() {
     }
   }
 
+  const getShippingFee = (country, method) => {
+    if (!product.isPhysical || !country || !method) return 0
+
+    const baseRates = {
+      standard: {
+        domestic: 5,
+        international: 15
+      },
+      express: {
+        domestic: 10,
+        international: 25
+      }
+    }
+
+    const weightMultiplier = Math.ceil(product.weight)
+    const isDomestic = country === "United States" // Adjust based on seller's country
+    const baseRate = baseRates[method][isDomestic ? "domestic" : "international"]
+
+    // Calculate fee based on weight and dimensions
+    const volumetricWeight = (
+      (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 5000
+    ) // Volumetric weight in kg
+    const calculatedWeight = Math.max(weightMultiplier, volumetricWeight)
+    const shippingFee = baseRate * calculatedWeight
+
+    // Add insurance for high-value items
+    const insuranceFee = product.currentBid > 1000 ? product.currentBid * 0.01 : 0
+
+    return shippingFee + insuranceFee
+  }
+
+  const calculateTotalPrice = () => {
+    const basePrice = Number(bidAmount) || product.currentBid
+    const shippingFee = product.isPhysical ? getShippingFee(shippingCountry, shippingMethod) : 0
+    const platformFee = basePrice * 0.025 // 2.5% platform fee
+    return basePrice + shippingFee + platformFee
+  }
+
   return (
     <div className="min-h-screen py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Image Section */}
           <div className="space-y-6">
-            <div className="card-glow rounded-lg overflow-hidden">
-              <Image
-                src={product.image || "/placeholder.svg"}
-                alt={product.title}
-                className="w-full aspect-square object-cover"
-              />
-            </div>
+<div className="card-glow rounded-lg overflow-hidden relative w-full h-64">
+  <Image
+    src={product.image}
+    alt={product.title}
+    fill
+    className="object-cover"
+  />
+</div>
+
 
             {/* Properties */}
             <div className="card-glow p-6 rounded-lg">
@@ -238,6 +283,89 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      {product.isPhysical && (
+  <div className="card-glow p-6 rounded-lg mt-6">
+    <h3 className="text-xl font-semibold mb-4">Shipping Information</h3>
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-2">Country</label>
+        <select
+          value={shippingCountry}
+          onChange={(e) => setShippingCountry(e.target.value)}
+          className="w-full px-4 py-2 bg-black/50 border border-gray-600 rounded-lg"
+        >
+          <option value="">Select Country</option>
+          {/* Add country options */}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Shipping Method</label>
+        <select
+          value={shippingMethod}
+          onChange={(e) => setShippingMethod(e.target.value)}
+          className="w-full px-4 py-2 bg-black/50 border border-gray-600 rounded-lg"
+        >
+          <option value="">Select Shipping Method</option>
+          {/* Add shipping method options */}
+        </select>
+      </div>
+    </div>
+
+    <div className="mt-4 space-y-2">
+      <div className="flex justify-between">
+        <span>Item Price:</span>
+        <span>{product.currentBid} XRPB</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Shipping Fee:</span>
+        <span>{getShippingFee(shippingCountry, shippingMethod)} XRPB</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Platform Fee (2.5%):</span>
+        <span>{(product.currentBid * 0.025).toFixed(2)} XRPB</span>
+      </div>
+      <div className="flex justify-between font-bold pt-2 border-t border-gray-600">
+        <span>Total:</span>
+        <span>{calculateTotalPrice().toFixed(2)} XRPB</span>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   )
 }
+
+
+const getShippingFee = (country, method) => {
+  if (!product.isPhysical || !country || !method) return 0
+
+  const baseRates = {
+    standard: {
+      domestic: 5,
+      international: 15
+    },
+    express: {
+      domestic: 10,
+      international: 25
+    }
+  }
+
+  const weightMultiplier = Math.ceil(product.weight)
+  const isDomestic = country === "United States" // Adjust based on seller's country
+  const baseRate = baseRates[method][isDomestic ? "domestic" : "international"]
+
+  // Calculate fee based on weight and dimensions
+  const volumetricWeight = (
+    (product.dimensions.length * product.dimensions.width * product.dimensions.height) / 5000
+  ) // Volumetric weight in kg
+  const calculatedWeight = Math.max(weightMultiplier, volumetricWeight)
+  const shippingFee = baseRate * calculatedWeight
+
+  // Add insurance for high-value items
+  const insuranceFee = product.currentBid > 1000 ? product.currentBid * 0.01 : 0
+
+  return shippingFee + insuranceFee
+}
+
+

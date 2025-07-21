@@ -1,13 +1,16 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
-import { Search, Grid, List } from "lucide-react"
+import { Search, Grid, List, Package, Square } from "lucide-react"
 import Image from "next/image"
+import { useParams } from "next/navigation"
 
 export default function MarketplacePage() {
   const [viewMode, setViewMode] = useState("grid")
+  const params = useParams()
   const [selectedChain, setSelectedChain] = useState("all")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [itemType, setItemType] = useState("all")
   const [sortBy, setSortBy] = useState("recent")
 
 const products = [
@@ -18,6 +21,7 @@ const products = [
     price: 150,
     chain: "xrp",
     category: "art",
+    isPhysical: false,
     seller: "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH",
     bids: 12,
     timeLeft: "2d 14h",
@@ -29,6 +33,7 @@ const products = [
     price: 75,
     chain: "solana",
     category: "gaming",
+    isPhysical: true,
     seller: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
     bids: 8,
     timeLeft: "1d 6h",
@@ -40,6 +45,7 @@ const products = [
     price: 200,
     chain: "evm",
     category: "music",
+    isPhysical: true,
     seller: "0x742d35Cc6634C0532925a3b8D4C9db96590b5b8e",
     bids: 25,
     timeLeft: "5h 30m",
@@ -50,6 +56,7 @@ const products = [
     image: "https://miro.medium.com/v2/resize:fit:700/0*4x1ilUDV5dMkZbKJ.png",
     price: 500,
     chain: "xrp",
+    isPhysical: false,
     category: "real-estate",
     seller: "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH",
     bids: 45,
@@ -62,6 +69,7 @@ const products = [
     price: 120,
     chain: "solana",
     category: "art",
+    isPhysical: false,
     seller: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
     bids: 18,
     timeLeft: "1d 22h",
@@ -71,6 +79,7 @@ const products = [
     title: "Collectible Trading Card",
     image: "https://learn.mudrex.com/wp-content/uploads/2023/04/WhatsApp-Image-2023-03-30-at-1.03.30-PM-2-jpeg.webp",
     price: 85,
+    isPhysical: true,
     chain: "evm",
     category: "collectibles",
     seller: "0x742d35Cc6634C0532925a3b8D4C9db96590b5b8e",
@@ -96,9 +105,16 @@ const products = [
     { id: "collectibles", name: "Collectibles" },
   ]
 
+  const itemTypes = [
+    { id: "all", name: "All Items", icon: <Square className="w-4 h-4" /> },
+    { id: "digital", name: "Digital Items", icon: <Square className="w-4 h-4" /> },
+    { id: "physical", name: "Physical Items", icon: <Package className="w-4 h-4" /> },
+  ]
+
   const filteredProducts = products.filter((product) => {
     if (selectedChain !== "all" && product.chain !== selectedChain) return false
     if (selectedCategory !== "all" && product.category !== selectedCategory) return false
+    if (itemType !== "all" && product.isPhysical !== (itemType === "physical")) return false
     return true
   })
 
@@ -121,7 +137,7 @@ const products = [
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-4xl font-bold mb-4">Marketplace</h1>
-          <p className="text-xl text-gray-300">Discover and trade unique digital assets across multiple blockchains</p>
+          <p className="text-xl text-gray-300">Discover digital assets and physical items across multiple blockchains</p>
         </div>
 
         {/* Search and Filters */}
