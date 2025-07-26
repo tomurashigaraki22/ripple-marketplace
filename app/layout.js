@@ -3,7 +3,8 @@ import "./globals.css"
 import Navbar from "./components/Navbar"
 import Footer from "./components/Footer"
 import { AuthProvider } from "./context/AuthContext"
-import { WalletProvider } from "./context/WalletContext"
+import { WalletProviderMain } from "./context/WalletContext"
+import { SolanaProvider } from "./components/SolanaWalletProvider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -17,11 +18,13 @@ export default function RootLayout({ children }) {
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-black text-white min-h-screen`}>
         <AuthProvider>
-          <WalletProvider>
-            <Navbar />
-            <main className="min-h-screen">{children}</main>
-            <Footer />
-          </WalletProvider>
+          <SolanaProvider>
+            <WalletProviderMain>
+              <Navbar />
+              <main className="min-h-screen">{children}</main>
+              <Footer />
+            </WalletProviderMain>
+          </SolanaProvider>
         </AuthProvider>
       </body>
     </html>

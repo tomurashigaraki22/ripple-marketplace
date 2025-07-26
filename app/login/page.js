@@ -37,9 +37,12 @@ export default function LoginPage() {
       })
 
       const data = await response.json()
+      console.log("Data: ", data)
 
       if (!response.ok) {
-        throw new Error(data.error || "Login failed")
+        console.log("Response is not ok: ", response)
+        setError(data.error || "Login failed")
+        return
       }
 
       // Use AuthContext login to save token and user info
@@ -64,7 +67,12 @@ export default function LoginPage() {
           <p className="text-gray-400">Sign in to your RippleBids account</p>
         </div>
 
-        {error && (
+
+
+        <div className="card-glow p-8 rounded-lg">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+                      {error !== "" && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
             {error}
           </div>
@@ -75,10 +83,6 @@ export default function LoginPage() {
             {success}
           </div>
         )}
-
-        <div className="card-glow p-8 rounded-lg">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
               <label className="block text-sm font-medium mb-2">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />

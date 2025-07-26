@@ -42,6 +42,7 @@ export default function SignupPage() {
       const data = await response.json()
 
       if (!response.ok) {
+        setError(data.error || "Registration failed")
         throw new Error(data.error || "Registration failed")
       }
 
@@ -59,15 +60,16 @@ export default function SignupPage() {
           <p className="text-gray-400">Join RippleBids and start trading</p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
-            {error}
-          </div>
-        )}
+
 
         <div className="card-glow p-8 rounded-lg">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
+                      {error !== "" && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
+            {error}
+          </div>
+        )}
               <label className="block text-sm font-medium mb-2">Username</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
