@@ -1,11 +1,11 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "../context/AuthContext"
 
-export default function LoginPage() {
+function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: "",
@@ -67,22 +67,20 @@ export default function LoginPage() {
           <p className="text-gray-400">Sign in to your RippleBids account</p>
         </div>
 
-
-
         <div className="card-glow p-8 rounded-lg">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-                      {error !== "" && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
-            {error}
-          </div>
-        )}
+              {error !== "" && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
+                  {error}
+                </div>
+              )}
 
-        {success && (
-          <div className="mb-4 p-3 bg-green-500/10 border border-green-500 rounded-lg text-green-500">
-            {success}
-          </div>
-        )}
+              {success && (
+                <div className="mb-4 p-3 bg-green-500/10 border border-green-500 rounded-lg text-green-500">
+                  {success}
+                </div>
+              )}
               <label className="block text-sm font-medium mb-2">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -180,5 +178,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-white">Loading...</div></div>}>
+      <LoginForm />
+    </Suspense>
   )
 }
