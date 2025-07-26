@@ -28,7 +28,7 @@ export const WalletProviderMain = ({ children }) => {
     connecting: solanaConnecting,
     disconnect: solanaDisconnect,
     wallet: solanaWalletAdapter,
-    connect: solanaConnect,
+    connect,
     select: solanaSelect
   } = useSolanaWallet();
   
