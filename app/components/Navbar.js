@@ -132,7 +132,7 @@ export default function Navbar() {
                 <div className="absolute inset-0 bg-[#39FF14]/20 rounded-full blur-md group-hover:blur-lg transition-all duration-300" />
                 <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-[#39FF14]/50 group-hover:border-[#39FF14] transition-all duration-300">
                   <Image
-                    src={require("../../public/logo.jpg")}
+                    src="/logo.jpg"
                     alt="RippleBids Logo"
                     width={48}
                     height={48}

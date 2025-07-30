@@ -5,25 +5,25 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateRandomPassword } from '../../lib/schema.js';
 
 // Helper function to verify user access
-async function verifyUserAccess(request) {
-  try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return { error: 'No token provided', status: 401 };
-    }
+// async function verifyUserAccess(request) {
+//   try {
+//     const token = request.headers.get('authorization')?.replace('Bearer ', '');
+//     if (!token) {
+//       return { error: 'No token provided', status: 401 };
+//     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const [users] = await db.query('SELECT * FROM users WHERE id = ?', [decoded.userId]);
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//     const [users] = await db.query('SELECT * FROM users WHERE id = ?', [decoded.userId]);
 
-    if (users.length === 0) {
-      return { error: 'User not found', status: 404 };
-    }
+//     if (users.length === 0) {
+//       return { error: 'User not found', status: 404 };
+//     }
 
-    return { user: users[0] };
-  } catch (error) {
-    return { error: 'Invalid token', status: 401 };
-  }
-}
+//     return { user: users[0] };
+//   } catch (error) {
+//     return { error: 'Invalid token', status: 401 };
+//   }
+// }
 
 // GET - Fetch user's membership history
 export async function GET(request) {

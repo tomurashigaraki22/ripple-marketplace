@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../lib/db.js';
-import { verifyUserAccess } from '../../utils/auth.js';
+import { db } from '@/app/lib/db.js';
+import { verifyUserAccess } from '@/app/utils/auth';
 
 export async function GET(request) {
   try {
