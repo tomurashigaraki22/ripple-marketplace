@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Search, Grid, List, Package, Square, Filter, Clock, Users } from "lucide-react"
 import Image from "next/image"
@@ -13,81 +13,63 @@ export default function MarketplacePage() {
   const [itemType, setItemType] = useState("all")
   const [sortBy, setSortBy] = useState("recent")
   const [searchQuery, setSearchQuery] = useState("")
+  const [listings, setListings] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({ total: 0, hasMore: false })
+  const [currentPage, setCurrentPage] = useState(0)
+  const ITEMS_PER_PAGE = 20
 
-const products = [
-  {
-    id: 1,
-    title: "Cosmic NFT Collection #1234",
-    image: "https://airnfts.s3.amazonaws.com/nft-images/20210814/The_Cosmic_Abyss_1628924218650.jpeg",
-    price: 150,
-    chain: "xrp",
-    category: "art",
-    isPhysical: false,
-    seller: "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH",
-    bids: 12,
-    timeLeft: "2d 14h",
-  },
-  {
-    id: 2,
-    title: "Digital Gaming Sword",
-    image: "https://img-cdn.magiceden.dev/autoquality:none/rs:fill:640:640:0:0/plain/https%3A%2F%2Fi.imgur.com%2FQZbnkpP.mp4%3Fext%3Dmp4",
-    price: 75,
-    chain: "solana",
-    category: "gaming",
-    isPhysical: true,
-    seller: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-    bids: 8,
-    timeLeft: "1d 6h",
-  },
-  {
-    id: 3,
-    title: "Rare Music NFT",
-    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQhIyAwZtT_n2GP0B7WMGp6Tsn3Glu5Lgb10A&s",
-    price: 200,
-    chain: "evm",
-    category: "music",
-    isPhysical: true,
-    seller: "0x742d35Cc6634C0532925a3b8D4C9db96590b5b8e",
-    bids: 25,
-    timeLeft: "5h 30m",
-  },
-  {
-    id: 4,
-    title: "Virtual Real Estate Plot",
-    image: "https://miro.medium.com/v2/resize:fit:700/0*4x1ilUDV5dMkZbKJ.png",
-    price: 500,
-    chain: "xrp",
-    isPhysical: false,
-    category: "real-estate",
-    seller: "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH",
-    bids: 45,
-    timeLeft: "3d 12h",
-  },
-  {
-    id: 5,
-    title: "Abstract Digital Art",
-    image: "https://static01.nyt.com/images/2021/08/15/fashion/TEEN-NFTS--fewocious/merlin_193103526_0e21192f-51f9-4f99-9389-c9aaaf858d09-articleLarge.jpg?quality=75&auto=webp&disable=upscale",
-    price: 120,
-    chain: "solana",
-    category: "art",
-    isPhysical: false,
-    seller: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-    bids: 18,
-    timeLeft: "1d 22h",
-  },
-  {
-    id: 6,
-    title: "Collectible Trading Card",
-    image: "https://learn.mudrex.com/wp-content/uploads/2023/04/WhatsApp-Image-2023-03-30-at-1.03.30-PM-2-jpeg.webp",
-    price: 85,
-    isPhysical: true,
-    chain: "evm",
-    category: "collectibles",
-    seller: "0x742d35Cc6634C0532925a3b8D4C9db96590b5b8e",
-    bids: 6,
-    timeLeft: "4h 15m",
-  },
-]
+  // Fetch listings from API
+  useEffect(() => {
+    fetchListings()
+  }, [selectedChain, selectedCategory, itemType, sortBy, searchQuery, currentPage])
+
+  const fetchListings = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        limit: ITEMS_PER_PAGE.toString(),
+        offset: (currentPage * ITEMS_PER_PAGE).toString(),
+        sortBy: sortBy === 'recent' ? 'recent' : sortBy === 'price-low' ? 'price_low' : sortBy === 'price-high' ? 'price_high' : 'recent'
+      })
+
+      if (selectedChain !== 'all') params.append('chain', selectedChain)
+      if (selectedCategory !== 'all') params.append('category', selectedCategory)
+      if (itemType !== 'all') params.append('isPhysical', itemType)
+      if (searchQuery) params.append('search', searchQuery)
+
+      const response = await fetch(`/api/marketplace?${params}`)
+      if (!response.ok) throw new Error('Failed to fetch listings')
+      
+      const data = await response.json()
+      
+      if (currentPage === 0) {
+        setListings(data.listings)
+      } else {
+        setListings(prev => [...prev, ...data.listings])
+      }
+      
+      setPagination(data.pagination)
+    } catch (error) {
+      console.error('Error fetching listings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLoadMore = () => {
+    setCurrentPage(prev => prev + 1)
+  }
+
+  const handleFilterChange = () => {
+    setCurrentPage(0)
+    setListings([])
+  }
+
+  // Reset page when filters change
+  useEffect(() => {
+    handleFilterChange()
+  }, [selectedChain, selectedCategory, itemType, sortBy, searchQuery])
 
   const chains = [
     { id: "all", name: "All Chains", icon: "🌐" },
@@ -110,14 +92,6 @@ const products = [
     { id: "digital", name: "Digital Items", icon: <Square className="w-4 h-4" /> },
     { id: "physical", name: "Physical Items", icon: <Package className="w-4 h-4" /> },
   ]
-
-  const filteredProducts = products.filter((product) => {
-    if (selectedChain !== "all" && product.chain !== selectedChain) return false
-    if (selectedCategory !== "all" && product.category !== selectedCategory) return false
-    if (itemType !== "all" && product.isPhysical !== (itemType === "physical")) return false
-    if (searchQuery && !product.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    return true
-  })
 
   const getChainIcon = (chain) => {
     switch (chain) {
@@ -239,7 +213,7 @@ const products = [
                 <option value="recent" className="bg-black">Recently Listed</option>
                 <option value="price-low" className="bg-black">Price: Low to High</option>
                 <option value="price-high" className="bg-black">Price: High to Low</option>
-                <option value="ending" className="bg-black">Ending Soon</option>
+                <option value="popular" className="bg-black">Most Popular</option>
               </select>
             </div>
 
@@ -276,8 +250,8 @@ const products = [
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
             <p className="text-gray-400">
-              <span className="text-white font-semibold">{filteredProducts.length}</span> of{" "}
-              <span className="text-white font-semibold">{products.length}</span> items
+              <span className="text-white font-semibold">{listings.length}</span> of{" "}
+              <span className="text-white font-semibold">{pagination.total}</span> items
             </p>
             {(selectedChain !== "all" || selectedCategory !== "all" || itemType !== "all" || searchQuery) && (
               <button
@@ -295,6 +269,13 @@ const products = [
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && listings.length === 0 && (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#39FF14]"></div>
+          </div>
+        )}
+
         {/* Products Grid/List */}
         <div
           className={`grid gap-6 mb-12 ${
@@ -303,14 +284,14 @@ const products = [
               : "grid-cols-1"
           }`}
         >
-          {filteredProducts.map((product) => (
-            <Link key={product.id} href={`/marketplace/${product.id}`}>
+          {listings.map((listing) => (
+            <Link key={listing.id} href={`/marketplace/${listing.id}`}>
               <div className="group bg-gray-900/50 backdrop-blur-sm rounded-2xl overflow-hidden border border-gray-800 hover:border-[#39FF14]/50 transition-all duration-300 hover:shadow-lg hover:shadow-[#39FF14]/10 cursor-pointer">
                 {/* Product Image */}
                 <div className="relative overflow-hidden">
                   <Image
-                    src={product.image}
-                    alt={product.title}
+                    src={listing.images?.[0] || '/placeholder-image.jpg'}
+                    alt={listing.title}
                     width={500}
                     height={300}
                     className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
@@ -321,21 +302,13 @@ const products = [
                   
                   {/* Chain Badge */}
                   <div className="absolute top-4 left-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getChainColor(product.chain)}`}>
-                      {getChainIcon(product.chain)} {product.chain.toUpperCase()}
-                    </span>
-                  </div>
-                  
-                  {/* Time Left Badge */}
-                  <div className="absolute top-4 right-4">
-                    <span className="px-3 py-1 bg-red-500/90 text-white rounded-full text-xs font-medium flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{product.timeLeft}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getChainColor(listing.chain)}`}>
+                      {getChainIcon(listing.chain)} {listing.chain.toUpperCase()}
                     </span>
                   </div>
                   
                   {/* Physical Item Badge */}
-                  {product.isPhysical && (
+                  {listing.is_physical && (
                     <div className="absolute bottom-4 left-4">
                       <span className="px-3 py-1 bg-[#39FF14]/90 text-black rounded-full text-xs font-medium flex items-center space-x-1">
                         <Package className="w-3 h-3" />
@@ -348,20 +321,20 @@ const products = [
                 {/* Product Info */}
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-white mb-3 line-clamp-2 group-hover:text-[#39FF14] transition-colors duration-200">
-                    {product.title}
+                    {listing.title}
                   </h3>
 
-                  {/* Price and Bids */}
+                  {/* Price and Views */}
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-xs text-gray-400 mb-1">Current Bid</p>
-                      <p className="text-xl font-bold text-[#39FF14]">{product.price} XRPB</p>
+                      <p className="text-xs text-gray-400 mb-1">Price</p>
+                      <p className="text-xl font-bold text-[#39FF14]">${parseFloat(listing.price)} {getChainIcon(listing.chain)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-gray-400 mb-1">Bids</p>
+                      <p className="text-xs text-gray-400 mb-1">Views</p>
                       <div className="flex items-center space-x-1 text-gray-300">
                         <Users className="w-4 h-4" />
-                        <span className="font-semibold">{product.bids}</span>
+                        <span className="font-semibold">{listing.views}</span>
                       </div>
                     </div>
                   </div>
@@ -370,17 +343,17 @@ const products = [
                   <div className="mb-6">
                     <p className="text-xs text-gray-400 mb-1">Owned by</p>
                     <p className="text-sm font-mono text-gray-300">
-                      {product.seller.slice(0, 6)}...{product.seller.slice(-4)}
+                      @{listing.seller_username}
                     </p>
                   </div>
 
                   {/* Action Buttons */}
                   <div className="flex space-x-3">
                     <button className="flex-1 py-3 bg-[#39FF14] text-black rounded-xl font-semibold hover:bg-[#39FF14]/90 hover:shadow-lg hover:shadow-[#39FF14]/20 transition-all duration-200 transform hover:scale-[1.02]">
-                      Place Bid
+                      View Details
                     </button>
                     <button className="flex-1 py-3 bg-transparent border border-[#39FF14] text-[#39FF14] rounded-xl font-semibold hover:bg-[#39FF14]/10 transition-all duration-200 transform hover:scale-[1.02]">
-                      Buy Now
+                      Quick Buy
                     </button>
                   </div>
                 </div>
@@ -390,16 +363,20 @@ const products = [
         </div>
 
         {/* Load More Section */}
-        {filteredProducts.length > 0 && (
+        {pagination.hasMore && (
           <div className="text-center">
-            <button className="px-8 py-4 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-semibold hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 transform hover:scale-105">
-              Load More Items
+            <button 
+              onClick={handleLoadMore}
+              disabled={loading}
+              className="px-8 py-4 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-semibold hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Loading...' : 'Load More Items'}
             </button>
           </div>
         )}
 
         {/* Empty State */}
-        {filteredProducts.length === 0 && (
+        {!loading && listings.length === 0 && (
           <div className="text-center py-16">
             <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
               <Search className="w-12 h-12 text-gray-600" />

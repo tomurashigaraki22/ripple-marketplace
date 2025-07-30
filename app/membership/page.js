@@ -1,11 +1,72 @@
+"use client"
+
+import { useState, useEffect } from 'react'
 import Link from "next/link"
-import { Check, Star, Crown, Zap, Sparkles, ArrowRight } from "lucide-react"
+import { Check, Star, Crown, Zap, Sparkles, ArrowRight, Wallet, X, AlertCircle, CheckCircle, Loader2, CreditCard, DollarSign, Store, ShoppingBag } from "lucide-react"
+import { useXRPL } from '../context/XRPLContext'
+import { useMetamask } from '../context/MetamaskContext'
+import { useWallet, useConnection } from '@solana/wallet-adapter-react'
+import { sendSolanaPayment, sendXRPPayment, sendEVMPayment } from '../constructs/payments/signAndPay'
+import { ethers } from 'ethers'
 
 export default function MembershipPage() {
+  // Wallet contexts
+  const { xrpWalletAddress, xrplWallet } = useXRPL()
+  const { metamaskWalletAddress, isConnected: metamaskConnected } = useMetamask()
+  const { publicKey, connected: solanaConnected } = useWallet()
+  const { connection } = useConnection()
+
+  // Payment states
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedTier, setSelectedTier] = useState(null)
+  const [paymentMethod, setPaymentMethod] = useState(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [paymentResult, setPaymentResult] = useState(null)
+  const [connectedWallets, setConnectedWallets] = useState([])
+  
+  // Add these new state variables for subscription status
+  const [currentMembership, setCurrentMembership] = useState(null)
+  const [isSubscriptionActive, setIsSubscriptionActive] = useState(false)
+  const [membershipLoading, setMembershipLoading] = useState(true)
+
+  // Update connected wallets
+  useEffect(() => {
+    const wallets = []
+    if (xrpWalletAddress) {
+      wallets.push({
+        type: 'xrp',
+        name: 'XUMM (XRP)',
+        address: xrpWalletAddress,
+        icon: '🔷',
+        currency: 'XRP'
+      })
+    }
+    if (metamaskConnected && metamaskWalletAddress) {
+      wallets.push({
+        type: 'evm',
+        name: 'MetaMask (ETH)',
+        address: metamaskWalletAddress,
+        icon: '🦊',
+        currency: 'ETH'
+      })
+    }
+    if (solanaConnected && publicKey) {
+      wallets.push({
+        type: 'solana',
+        name: 'Solflare (SOL)',
+        address: publicKey.toString(),
+        icon: '☀️',
+        currency: 'SOL'
+      })
+    }
+    setConnectedWallets(wallets)
+  }, [xrpWalletAddress, metamaskConnected, metamaskWalletAddress, solanaConnected, publicKey])
+
   const tiers = [
     {
       name: "Free",
       price: "Free",
+      priceUSD: 0,
       icon: <Star className="w-8 h-8" />,
       features: [
         "Basic marketplace access",
@@ -17,10 +78,12 @@ export default function MembershipPage() {
       buttonText: "Current Plan",
       buttonClass: "bg-black/40 backdrop-blur-xl border border-gray-600 text-gray-400 cursor-not-allowed",
       popular: false,
+      disabled: true
     },
     {
       name: "Pro",
       price: "100 XRPB/month",
+      priceUSD: 50,
       icon: <Zap className="w-8 h-8" />,
       features: [
         "All Free features",
@@ -34,10 +97,12 @@ export default function MembershipPage() {
       buttonText: "Upgrade to Pro",
       buttonClass: "bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black hover:shadow-[0_0_40px_rgba(57,255,20,0.6)] transform hover:scale-105",
       popular: true,
+      disabled: false
     },
     {
       name: "Premium",
       price: "500 XRPB/month",
+      priceUSD: 250,
       icon: <Crown className="w-8 h-8" />,
       features: [
         "All Pro features",
@@ -52,6 +117,7 @@ export default function MembershipPage() {
       buttonText: "Upgrade to Premium",
       buttonClass: "bg-black/40 backdrop-blur-xl border-2 border-[#39FF14]/50 text-[#39FF14] hover:border-[#39FF14] hover:shadow-[0_0_30px_rgba(57,255,20,0.3)] transform hover:scale-105",
       popular: false,
+      disabled: false
     },
   ]
 
@@ -78,6 +144,183 @@ export default function MembershipPage() {
     },
   ]
 
+  // Calculate payment amounts based on wallet type
+  const getPaymentAmount = (tier, walletType) => {
+    const basePrice = tier.priceUSD
+    switch (walletType) {
+      case 'xrp':
+        return (basePrice / 2).toFixed(2) // Assuming 1 XRP = $0.50
+      case 'solana':
+        return (basePrice / 20).toFixed(3) // Assuming 1 SOL = $20
+      case 'evm':
+        return (basePrice / 2000).toFixed(4) // Assuming 1 ETH = $2000
+      default:
+        return basePrice
+    }
+  }
+
+  const handleUpgrade = (tier) => {
+    if (tier.disabled) return
+    
+    if (connectedWallets.length === 0) {
+      alert('Please connect a wallet first!')
+      return
+    }
+    
+    setSelectedTier(tier)
+    setShowPaymentModal(true)
+    setPaymentResult(null)
+  }
+
+  // Add these useEffect hooks and functions
+  useEffect(() => {
+    fetchCurrentMembership()
+    fetchMembershipTiers()
+  }, [])
+
+  const fetchCurrentMembership = async () => {
+    try {
+      setMembershipLoading(true)
+      const token = localStorage.getItem('authToken')
+      if (!token) {
+        setMembershipLoading(false)
+        return
+      }
+  
+      const response = await fetch('/api/membership/current', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+  
+      if (response.ok) {
+        const data = await response.json()
+        setCurrentMembership(data.currentMembership)
+        // Check if subscription is active (Pro or Premium)
+        const isActive = data.currentMembership && 
+                      data.currentMembership.membership &&
+                      Boolean(data.currentMembership.membership.isActive) && // Convert 1 to true
+                      (data.currentMembership.tier.name.toLowerCase() === 'pro' || 
+                       data.currentMembership.tier.name.toLowerCase() === 'premium')
+        setIsSubscriptionActive(isActive)
+        console.log('Current membership:', data.currentMembership)
+      }
+    } catch (error) {
+      console.error('Error fetching current membership:', error)
+    } finally {
+      setMembershipLoading(false)
+    }
+  }
+  
+  const fetchMembershipTiers = async () => {
+    try {
+      const token = localStorage.getItem('authToken')
+      if (!token) return
+  
+      const response = await fetch('/api/membership/tiers-with-status', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+  
+      if (response.ok) {
+        const data = await response.json()
+        // Update tiers with user status
+        console.log('Membership tiers:', data.membershipTiers)
+      }
+    } catch (error) {
+      console.error('Error fetching membership tiers:', error)
+    }
+  }
+
+  // Update the handlePayment function
+  const handlePayment = async () => {
+    if (!selectedTier || !paymentMethod) return
+
+    setIsProcessing(true)
+    setPaymentResult(null)
+
+    try {
+      let result
+      const amount = getPaymentAmount(selectedTier, paymentMethod.type)
+
+      switch (paymentMethod.type) {
+        case 'solana':
+          result = await sendSolanaPayment(
+            { publicKey, connected: solanaConnected, signTransaction: async (tx) => tx },
+            parseFloat(amount),
+            connection
+          )
+          break
+
+        case 'xrp':
+          // Show loading message for XRP payments
+          setPaymentResult({
+            success: false,
+            pending: true,
+            message: 'Please complete the payment in XUMM app. This may take a few minutes...'
+          })
+          
+          result = await sendXRPPayment(
+            { account: xrpWalletAddress },
+            parseFloat(1),
+            'XRPL'
+          )
+          break
+
+        case 'evm':
+          if (window.ethereum) {
+            const provider = new ethers.BrowserProvider(window.ethereum)
+            const signer = await provider.getSigner()
+            result = await sendEVMPayment(signer, parseFloat(amount))
+          } else {
+            throw new Error('MetaMask not available')
+          }
+          break
+
+        default:
+          throw new Error('Unsupported payment method')
+      }
+
+      setPaymentResult(result)
+      
+      if (result.success) {
+        // Store membership upgrade locally
+        const membershipData = {
+          tier: selectedTier.name,
+          paymentMethod: paymentMethod.name,
+          amount: amount,
+          currency: paymentMethod.currency,
+          timestamp: new Date().toISOString(),
+          txHash: result.signature || result.txHash,
+          paymentUrl: result.paymentUrl,
+          verified: result.paymentData?.verified,
+          xummUuid: result.paymentData?.xummUuid
+        }
+        localStorage.setItem('membership_upgrade', JSON.stringify(membershipData))
+        
+        console.log('✅ Membership upgrade completed:', membershipData)
+      }
+
+    } catch (error) {
+      console.error('Payment failed:', error)
+      setPaymentResult({
+        success: false,
+        error: error.message
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const closeModal = () => {
+    setShowPaymentModal(false)
+    setSelectedTier(null)
+    setPaymentMethod(null)
+    setPaymentResult(null)
+    setIsProcessing(false)
+  }
+
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       {/* Animated Background */}
@@ -103,6 +346,79 @@ export default function MembershipPage() {
             <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto font-light leading-relaxed">
               Unlock exclusive benefits, lower fees, and <span className="text-[#39FF14] font-semibold">premium features</span> with XRPB membership tiers
             </p>
+            
+            {/* Active Subscription Status with Storefront Access */}
+            {!membershipLoading && isSubscriptionActive && currentMembership && (
+              <div className="mt-8 flex justify-center">
+                <div className="bg-gradient-to-r from-[#39FF14]/20 to-emerald-400/20 backdrop-blur-xl border-2 border-[#39FF14]/60 rounded-3xl p-8 max-w-2xl w-full">
+                  <div className="text-center">
+                    <div className="flex justify-center mb-4">
+                      <div className="w-16 h-16 bg-gradient-to-br from-[#39FF14] to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(57,255,20,0.5)]">
+                        {currentMembership.tier.name === 'Premium' ? (
+                          <Crown className="w-8 h-8 text-black" />
+                        ) : (
+                          <Zap className="w-8 h-8 text-black" />
+                        )}
+                      </div>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">
+                      🎉 {currentMembership.tier.name.toUpperCase()} Member Active!
+                    </h2>
+                    <p className="text-[#39FF14] font-semibold mb-6">
+                      Subscription Status: {Boolean(currentMembership.membership?.isActive) ? 'Active' : 'Inactive'}
+                      {currentMembership.membership?.expiresAt && (
+                        <span className="block text-sm text-gray-300 mt-1">
+                          Expires: {new Date(currentMembership.membership.expiresAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </p>
+                    
+                    {/* Prominent Storefront Login Button */}
+                    <Link
+                      href="/storefront/login"
+                      className="group relative inline-flex items-center px-8 py-4 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold text-lg hover:shadow-[0_0_50px_rgba(57,255,20,0.8)] transition-all duration-300 transform hover:scale-110 overflow-hidden"
+                    >
+                      <span className="absolute inset-0 bg-gradient-to-r from-[#39FF14] to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl"></span>
+                      <span className="relative flex items-center gap-3">
+                        <Store className="w-6 h-6" />
+                        Access Your Storefront
+                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                      </span>
+                    </Link>
+                    
+                    <div className="mt-4 flex justify-center space-x-6 text-sm text-gray-300">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-4 h-4 text-[#39FF14]" />
+                        <span>Reduced Fees Active</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <ShoppingBag className="w-4 h-4 text-[#39FF14]" />
+                        <span>Storefront Access</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Connected Wallets Status */}
+            {connectedWallets.length > 0 && (
+              <div className={`${isSubscriptionActive ? 'mt-6' : 'mt-8'} flex justify-center`}>
+                <div className="bg-black/40 backdrop-blur-xl border border-[#39FF14]/30 rounded-2xl px-6 py-3">
+                  <div className="flex items-center space-x-4">
+                    <CheckCircle className="w-5 h-5 text-[#39FF14]" />
+                    <span className="text-white font-medium">
+                      {connectedWallets.length} Wallet{connectedWallets.length > 1 ? 's' : ''} Connected
+                    </span>
+                    <div className="flex space-x-2">
+                      {connectedWallets.map((wallet, index) => (
+                        <span key={index} className="text-lg">{wallet.icon}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Pricing Cards */}
@@ -137,6 +453,9 @@ export default function MembershipPage() {
                     </div>
                     <h3 className="text-2xl font-bold mb-4 text-white group-hover:text-[#39FF14] transition-colors duration-300">{tier.name}</h3>
                     <div className="text-3xl font-black bg-gradient-to-r from-[#39FF14] to-emerald-400 bg-clip-text text-transparent mb-4">{tier.price}</div>
+                    {tier.priceUSD > 0 && (
+                      <div className="text-sm text-gray-400">${tier.priceUSD} USD equivalent</div>
+                    )}
                   </div>
 
                   <div className="space-y-4 mb-8">
@@ -150,7 +469,11 @@ export default function MembershipPage() {
                     ))}
                   </div>
 
-                  <button className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 ${tier.buttonClass}`}>
+                  <button 
+                    onClick={() => handleUpgrade(tier)}
+                    disabled={tier.disabled}
+                    className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 ${tier.buttonClass}`}
+                  >
                     {tier.buttonText}
                   </button>
                 </div>
@@ -181,48 +504,260 @@ export default function MembershipPage() {
             </div>
           </div>
 
-          {/* Payment Options */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/10 to-emerald-400/10 rounded-3xl blur-xl"></div>
-            <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-12 rounded-3xl">
-              <h2 className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent">Payment Options</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                <div className="group text-center p-8 bg-black/40 backdrop-blur-xl border border-[#39FF14]/20 rounded-2xl hover:border-[#39FF14]/40 transition-all duration-300 transform hover:scale-105">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#39FF14] to-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(57,255,20,0.3)]">
-                    <span className="text-2xl">🪙</span>
-                  </div>
-                  <h3 className="text-xl font-bold mb-3 text-white group-hover:text-[#39FF14] transition-colors duration-300">Pay with XRPB</h3>
-                  <p className="text-gray-400 mb-4 leading-relaxed">Use your XRPB tokens for membership upgrades</p>
-                  <div className="text-[#39FF14] font-bold text-lg">10% Discount</div>
+          {/* Connect Wallet CTA */}
+          {connectedWallets.length === 0 && (
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/10 to-emerald-400/10 rounded-3xl blur-xl"></div>
+              <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-12 rounded-3xl">
+                <div className="text-center">
+                  <AlertCircle className="w-16 h-16 text-[#39FF14] mx-auto mb-6" />
+                  <h2 className="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent">Connect Your Wallet</h2>
+                  <p className="text-xl text-gray-300 mb-8">Connect a wallet to upgrade your membership and unlock premium features</p>
+                  <Link
+                    href="/wallet"
+                    className="group relative inline-flex items-center px-12 py-6 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold text-xl hover:shadow-[0_0_50px_rgba(57,255,20,0.6)] transition-all duration-300 transform hover:scale-105 overflow-hidden"
+                  >
+                    <span className="absolute inset-0 bg-gradient-to-r from-[#39FF14] to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl"></span>
+                    <span className="relative flex items-center gap-3">
+                      <Wallet className="w-6 h-6" />
+                      Connect Wallet
+                      <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform duration-300" />
+                    </span>
+                  </Link>
                 </div>
-
-                <div className="group text-center p-8 bg-black/40 backdrop-blur-xl border border-[#39FF14]/20 rounded-2xl hover:border-[#39FF14]/40 transition-all duration-300 transform hover:scale-105">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#39FF14]/20 to-emerald-400/20 rounded-2xl flex items-center justify-center mx-auto mb-6 text-[#39FF14] group-hover:shadow-[0_0_20px_rgba(57,255,20,0.3)] transition-all duration-300">
-                    <span className="text-2xl">💵</span>
-                  </div>
-                  <h3 className="text-xl font-bold mb-3 text-white group-hover:text-[#39FF14] transition-colors duration-300">Pay with USDT</h3>
-                  <p className="text-gray-400 mb-4 leading-relaxed">Pay with USDT across all supported chains</p>
-                  <div className="text-gray-400 font-semibold">Standard Pricing</div>
-                </div>
-              </div>
-
-              <div className="text-center">
-                <Link
-                  href="/wallet"
-                  className="group relative inline-flex items-center px-12 py-6 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold text-xl hover:shadow-[0_0_50px_rgba(57,255,20,0.6)] transition-all duration-300 transform hover:scale-105 overflow-hidden"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-r from-[#39FF14] to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl"></span>
-                  <span className="relative flex items-center gap-3">
-                    Connect Wallet to Upgrade
-                    <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform duration-300" />
-                  </span>
-                </Link>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-black/90 backdrop-blur-xl border border-[#39FF14]/30 rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent">
+                Upgrade to {selectedTier?.name}
+              </h2>
+              <button 
+                onClick={closeModal}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {!paymentResult ? (
+              <>
+                {/* Payment Method Selection */}
+                <div className="mb-8">
+                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2 text-[#39FF14]" />
+                    Choose Payment Method
+                  </h3>
+                  <div className="grid gap-4">
+                    {connectedWallets.map((wallet, index) => {
+                      const amount = getPaymentAmount(selectedTier, wallet.type)
+                      return (
+                        <div
+                          key={wallet.type}
+                          onClick={() => setPaymentMethod(wallet)}
+                          className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
+                            paymentMethod?.type === wallet.type
+                              ? 'border-[#39FF14] bg-[#39FF14]/10 shadow-[0_0_20px_rgba(57,255,20,0.3)]'
+                              : 'border-gray-600 bg-black/40 hover:border-[#39FF14]/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <span className="text-3xl">{wallet.icon}</span>
+                              <div>
+                                <p className="text-white font-semibold">{wallet.name}</p>
+                                <p className="text-gray-400 text-sm font-mono">
+                                  {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[#39FF14] font-bold text-lg">
+                                {amount} {wallet.currency}
+                              </p>
+                              <p className="text-gray-400 text-sm">
+                                ≈ ${selectedTier?.priceUSD} USD
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Payment Summary */}
+                {paymentMethod && (
+                  <div className="mb-8 p-6 bg-gradient-to-r from-[#39FF14]/10 to-emerald-400/10 rounded-2xl border border-[#39FF14]/30">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                      <DollarSign className="w-5 h-5 mr-2 text-[#39FF14]" />
+                      Payment Summary
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Membership Tier:</span>
+                        <span className="text-white font-semibold">{selectedTier?.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Payment Method:</span>
+                        <span className="text-white font-semibold">{paymentMethod.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Amount:</span>
+                        <span className="text-[#39FF14] font-bold">
+                          {getPaymentAmount(selectedTier, paymentMethod.type)} {paymentMethod.currency}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-gray-600 pt-3">
+                        <span className="text-gray-300">USD Equivalent:</span>
+                        <span className="text-white font-semibold">${selectedTier?.priceUSD}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex space-x-4">
+                  <button
+                    onClick={closeModal}
+                    className="flex-1 py-4 px-6 bg-gray-600 text-white rounded-2xl font-semibold hover:bg-gray-500 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePayment}
+                    disabled={!paymentMethod || isProcessing}
+                    className="flex-1 py-4 px-6 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold hover:shadow-[0_0_30px_rgba(57,255,20,0.5)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      'Confirm Payment'
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Payment Result */
+              <div className="text-center">
+                {paymentResult.success ? (
+                  <>
+                    <CheckCircle className="w-16 h-16 text-[#39FF14] mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-[#39FF14] mb-4">Payment Successful!</h3>
+                    <p className="text-gray-300 mb-6">
+                      Your membership has been upgraded to {selectedTier?.name}.
+                    </p>
+                    <div className="bg-black/40 p-4 rounded-xl mb-6">
+                      <p className="text-sm text-gray-400 mb-2">Transaction Hash:</p>
+                      <p className="font-mono text-xs text-[#39FF14] break-all">
+                        {paymentResult.signature || paymentResult.txHash}
+                      </p>
+                    </div>
+                    {paymentResult.paymentData?.explorerUrl && (
+                      <a
+                        href={paymentResult.paymentData.explorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#39FF14] hover:underline text-sm"
+                      >
+                        View on Explorer →
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-red-500 mb-4">Payment Failed</h3>
+                    <p className="text-gray-300 mb-6">
+                      {paymentResult.error || 'An error occurred during payment processing.'}
+                    </p>
+                  </>
+                )}
+                <button
+                  onClick={closeModal}
+                  className="py-3 px-8 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold hover:shadow-[0_0_30px_rgba(57,255,20,0.5)] transition-all duration-300"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+            {/* Payment Result Display */}
+            {paymentResult && (
+              <div className="mt-8 p-6 rounded-2xl border-2 transition-all duration-300 ${
+                paymentResult.success 
+                  ? 'border-[#39FF14] bg-[#39FF14]/10' 
+                  : paymentResult.pending
+                  ? 'border-yellow-500 bg-yellow-500/10'
+                  : 'border-red-500 bg-red-500/10'
+              }">
+                <div className="flex items-center space-x-3 mb-4">
+                  {paymentResult.success ? (
+                    <CheckCircle className="w-6 h-6 text-[#39FF14]" />
+                  ) : paymentResult.pending ? (
+                    <Loader2 className="w-6 h-6 text-yellow-500 animate-spin" />
+                  ) : (
+                    <AlertCircle className="w-6 h-6 text-red-500" />
+                  )}
+                  <h3 className={`text-lg font-semibold ${
+                    paymentResult.success 
+                      ? 'text-[#39FF14]' 
+                      : paymentResult.pending
+                      ? 'text-yellow-500'
+                      : 'text-red-500'
+                  }`}>
+                    {paymentResult.success 
+                      ? 'Payment Successful!' 
+                      : paymentResult.pending
+                      ? 'Payment Pending'
+                      : 'Payment Failed'
+                    }
+                  </h3>
+                </div>
+                
+                {paymentResult.pending && paymentResult.message && (
+                  <p className="text-yellow-400 mb-4">{paymentResult.message}</p>
+                )}
+                
+                {paymentResult.success && (
+                  <div className="space-y-2 text-sm">
+                    <p className="text-gray-300">
+                      <span className="font-medium">Transaction:</span> 
+                      <span className="font-mono ml-2">
+                        {(paymentResult.signature || paymentResult.txHash)?.slice(0, 20)}...
+                      </span>
+                    </p>
+                    {paymentResult.paymentData?.explorerUrl && (
+                      <a 
+                        href={paymentResult.paymentData.explorerUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-[#39FF14] hover:text-emerald-400 transition-colors"
+                      >
+                        View on Explorer
+                        <ArrowRight className="w-4 h-4 ml-1" />
+                      </a>
+                    )}
+                  </div>
+                )}
+                
+                {paymentResult.error && (
+                  <p className="text-red-400">{paymentResult.error}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

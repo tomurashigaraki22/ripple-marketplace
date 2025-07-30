@@ -2,13 +2,12 @@
 import { useState, useEffect } from "react"
 import { User, Wallet, Activity, Gift, TrendingUp, Settings, LogOut, Star, Shield, Zap, Globe, Eye, Bell, Lock, CreditCard, Award, ChevronRight } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
-import { useWallet2 } from "../context/WalletContext"
 
 export default function PortalPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [isLoading, setIsLoading] = useState(true)
   const { user, logout } = useAuth()
-  const { xrpAddress, metaMaskAddress, xrplEvmAddress } = useWallet2()
+  const xrpAddress = 'rDlnwidnaniwdn20jnildnaw'
 
   useEffect(() => {
     // Simulate loading

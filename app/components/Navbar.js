@@ -1,36 +1,39 @@
 "use client"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Menu, X, Wallet, User, ShoppingBag, LogOut, ChevronDown, Zap, Shield, Globe } from "lucide-react"
+import { Menu, X, Wallet, User, ShoppingBag, LogOut, ChevronDown, Zap, Shield, Globe, Package } from "lucide-react"
 import Image from "next/image"
 import { useAuth } from "../context/AuthContext"
-import { useWallet2 } from "../context/WalletContext"
-import { useWallet } from "@solana/wallet-adapter-react"
+import { useXRPL } from "../context/XRPLContext"
+import { useMetamask } from "../context/MetamaskContext"
+import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showWalletMenu, setShowWalletMenu] = useState(false)
-  const { connect } = useWallet()
   const [scrolled, setScrolled] = useState(false)
   const { user, logout } = useAuth()
+  
+  // Individual wallet contexts
   const { 
-    // XRPL/XUMM
     xrpWalletAddress,
     connectXrpWallet,
     disconnectXrpWallet,
-    
-    // MetaMask/EVM
+  } = useXRPL()
+  
+  const {
     metamaskWalletAddress,
     connectMetamaskWallet,
     disconnectMetamaskWallet,
     connecting,
-    
-    // Phantom/Solana
-    phantomWalletAddress,
-    connectPhantomWallet,
-    disconnectPhantomWallet,
-  } = useWallet2()
+  } = useMetamask()
+  
+  // Solana Wallet Adapter hooks
+  const { publicKey, connected, connecting: phantomConnecting, disconnect } = useWallet()
+  const { connection } = useConnection()
+  
+  const phantomWalletAddress = publicKey?.toString()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -55,7 +58,7 @@ export default function Navbar() {
           await connectMetamaskWallet()
           break
         case 'phantom':
-          await connectPhantomWallet()
+          // Phantom connection is handled by WalletMultiButton
           break
         default:
           console.error('Unknown wallet type:', walletType)
@@ -76,7 +79,7 @@ export default function Navbar() {
           await disconnectMetamaskWallet()
           break
         case 'phantom':
-          await disconnectPhantomWallet()
+          await disconnect()
           break
         default:
           console.error('Unknown wallet type:', walletType)
@@ -149,6 +152,7 @@ export default function Navbar() {
             <div className="hidden lg:flex items-center space-x-1">
               {[
                 { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
+                { href: '/marketplace/orders', label: 'My Orders', icon: Package },
                 { href: '/membership', label: 'Membership', icon: Shield },
                 { href: '/portal', label: 'My Portal', icon: User },
                 { href: '/faqs', label: 'FAQs', icon: Globe }
