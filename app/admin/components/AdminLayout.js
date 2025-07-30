@@ -113,14 +113,14 @@ export default function AdminLayout({ children }) {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="flex items-center space-x-4">
+            {/* <div className="flex items-center space-x-4">
               <Link
                 href="/marketplace"
                 className="text-gray-400 hover:text-[#39FF14] transition-colors text-sm"
               >
                 ← Back to Marketplace
               </Link>
-            </div>
+            </div> */}
           </div>
         </div>
 

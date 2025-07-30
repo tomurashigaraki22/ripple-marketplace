@@ -186,7 +186,7 @@ export default function MyOrdersPage() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center mb-6">
+          {/* <div className="flex items-center mb-6">
             <Link
               href="/marketplace"
               className="flex items-center text-gray-400 hover:text-[#39FF14] transition-colors duration-300 mr-4"
@@ -194,7 +194,7 @@ export default function MyOrdersPage() {
               <ArrowLeft className="w-5 h-5 mr-2" />
               Back to Marketplace
             </Link>
-          </div>
+          </div> */}
           
           <div className="flex items-center justify-between">
             <div>
