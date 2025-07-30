@@ -40,10 +40,10 @@ const MetamaskProviderInner = ({ children }) => {
         throw new Error('MetaMask connector not found');
       }
 
-      if (!window.ethereum) {
-        alert("MetaMask is not installed. Please install MetaMask and try again.");
-        return;
-      }
+      // if (!window.ethereum) {
+      //   alert("MetaMask is not installed. Please install MetaMask and try again.");
+      //   return;
+      // }
 
       connect({ connector: metamaskConnector });
     } catch (error) {
