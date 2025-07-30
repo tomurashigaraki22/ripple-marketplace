@@ -3,19 +3,29 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { mainnet } from 'wagmi/chains';
-import { injected } from 'wagmi/connectors';
+import { injected, walletConnect } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 
 const MetamaskContext = createContext(null);
 
-// Wagmi configuration
+// Wagmi configuration with mobile support
 const config = createConfig({
   chains: [mainnet],
   connectors: [
     injected({
       target: 'metaMask',
     }),
+    // Add WalletConnect for mobile support
+    walletConnect({
+      projectId: "7f999d777dd494df9a3038f609665cea",
+      metadata: {
+        name: 'RippleBids',
+        description: 'Blockchain-powered marketplace',
+        url: 'https://your-domain.com',
+        icons: ['https://your-domain.com/logo.jpg']
+      }
+    })
   ],
   transports: {
     [mainnet.id]: http(),
@@ -23,6 +33,12 @@ const config = createConfig({
 });
 
 const queryClient = new QueryClient();
+
+// Helper function to detect mobile
+const isMobile = () => {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
 
 // Inner component that uses Wagmi hooks
 const MetamaskProviderInner = ({ children }) => {
@@ -32,18 +48,38 @@ const MetamaskProviderInner = ({ children }) => {
 
   const connectMetamaskWallet = async () => {
     try {
+      const mobile = isMobile();
+      
+      if (mobile) {
+        // For mobile devices, try WalletConnect first, then deep link to MetaMask
+        const walletConnectConnector = connectors.find(
+          (connector) => connector.id === 'walletConnect'
+        );
+        
+        if (walletConnectConnector) {
+          connect({ connector: walletConnectConnector });
+          return;
+        }
+        
+        // Fallback: Deep link to MetaMask mobile app
+        const deepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+        window.open(deepLink, '_blank');
+        return;
+      }
+      
+      // Desktop: Use injected connector
       const metamaskConnector = connectors.find(
         (connector) => connector.id === 'metaMask'
       );
-      console.log("Conectors: ", connectors)
+      
       if (!metamaskConnector) {
         throw new Error('MetaMask connector not found');
       }
 
-      // if (!window.ethereum) {
-      //   alert("MetaMask is not installed. Please install MetaMask and try again.");
-      //   return;
-      // }
+      if (!window.ethereum) {
+        alert("MetaMask is not installed. Please install MetaMask and try again.");
+        return;
+      }
 
       connect({ connector: metamaskConnector });
     } catch (error) {

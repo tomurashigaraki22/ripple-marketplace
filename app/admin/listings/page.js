@@ -3,10 +3,12 @@ import { useState, useEffect } from "react"
 import { Search, Filter, Eye, CheckCircle, XCircle, Clock, Package } from "lucide-react"
 import AdminLayout from "../components/AdminLayout"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 
 export default function AdminListings() {
   const [listings, setListings] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
+  const router = useRouter()
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterCategory, setFilterCategory] = useState("all")
 
@@ -60,6 +62,9 @@ export default function AdminListings() {
       })
       
       if (response.ok) {
+        if (action === "view"){
+          router.push(`/marketplace/${listingId}`)
+        }
         fetchListings()
       } else {
         throw new Error('Failed to update listing')

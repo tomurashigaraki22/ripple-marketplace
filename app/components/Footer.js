@@ -11,8 +11,13 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 rounded-full flex items-center justify-center">
-                <Image src="/logo.jpg" alt="RippleBids Logo"/>
-              </div>
+<Image
+                    src="/logo.jpg"
+                    alt="RippleBids Logo"
+                    width={48}
+                    height={48}
+                    className="object-cover"
+                  />                </div>
               <span className="text-xl font-bold neon-text">RippleBids</span>
             </div>
             <p className="text-gray-400 mb-4">
