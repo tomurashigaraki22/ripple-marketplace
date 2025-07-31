@@ -329,7 +329,6 @@ export default function MembershipPage() {
         // In the handlePayment function, around line 325, replace the solana case with:
         case 'solana':
         // Use the wallet object directly from useWallet hook
-        const wallet = useWallet();
         
         // Validate wallet before proceeding
         if (!wallet.connected || !wallet.publicKey) {
