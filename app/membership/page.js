@@ -326,7 +326,7 @@ export default function MembershipPage() {
         case 'solana':
           result = await sendSolanaXRPBPayment(
             { publicKey, connected: solanaConnected, signTransaction: async (tx) => tx },
-            xrpbAmount,
+            1,
             connection
           );
           break;
