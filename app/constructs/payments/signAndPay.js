@@ -143,12 +143,30 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
       wallet.publicKey
     );
     
+    // Check if sender has XRPB token account
+    console.log('🔍 Checking sender token account...');
+    const senderAccountInfo = await connection.getAccountInfo(senderTokenAccount);
+    if (!senderAccountInfo) {
+      throw new Error('❌ You do not have an XRPB token account. Please ensure you have XRPB tokens in your wallet first.');
+    }
+    
+    // Check sender's XRPB balance
+    console.log('💰 Checking XRPB balance...');
+    const senderTokenAccountInfo = await connection.getTokenAccountBalance(senderTokenAccount);
+    const currentBalance = senderTokenAccountInfo.value.uiAmount || 0;
+    
+    console.log('Current XRPB balance:', currentBalance);
+    console.log('Required amount:', amount);
+    
+    if (currentBalance < amount) {
+      throw new Error(`❌ Insufficient XRPB balance. Required: ${amount} XRPB, Available: ${currentBalance} XRPB`);
+    }
+    
     // Get or create recipient's associated token account
-    // This automatically handles account creation if it doesn't exist
     console.log('📝 Getting or creating recipient token account...');
     const recipientTokenAccountInfo = await getOrCreateAssociatedTokenAccount(
       connection,
-      wallet.publicKey, // payer (wallet will pay for account creation if needed)
+      wallet.publicKey, // payer
       mintAddress,
       recipientAddress
     );
@@ -161,7 +179,7 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     console.log('📝 Creating transfer instruction...');
     console.log('From token account:', senderTokenAccount.toString());
     console.log('To token account:', recipientTokenAccount.toString());
-    console.log('Token amount:', tokenAmount);
+    console.log('Token amount (raw):', tokenAmount);
     
     // Create transfer instruction
     const transferInstruction = createTransferInstruction(
@@ -191,8 +209,25 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     
     console.log('📝 Transaction prepared with blockhash:', blockhash);
     
-    // Sign and send transaction using wallet's sendTransaction method
-    const signature = await wallet.sendTransaction(transaction, connection);
+    // Use the correct method based on wallet type
+    let signature;
+    
+    if (wallet.sendTransaction) {
+      // For @solana/wallet-adapter wallets
+      console.log('📤 Using wallet.sendTransaction method...');
+      signature = await wallet.sendTransaction(transaction, connection);
+    } else if (wallet.signAndSendTransaction) {
+      // For some wallet adapters
+      console.log('📤 Using wallet.signAndSendTransaction method...');
+      signature = await wallet.signAndSendTransaction(transaction);
+    } else if (wallet.signTransaction) {
+      // Manual sign and send
+      console.log('📤 Using manual sign and send...');
+      const signedTransaction = await wallet.signTransaction(transaction);
+      signature = await connection.sendRawTransaction(signedTransaction.serialize());
+    } else {
+      throw new Error('❌ Wallet does not support any known transaction sending methods');
+    }
     
     console.log('📤 Transaction sent with signature:', signature);
     
