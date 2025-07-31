@@ -336,7 +336,7 @@ export default function MembershipPage() {
         
         result = await sendSolanaXRPBPayment(
         walletAdapter, // Pass the adapter instead of the wrapper
-        xrpbAmount,
+        2,
         connection
         );
         break;
