@@ -84,36 +84,32 @@ export const calculateXRPBAmount = (usdAmount, xrpbPrice) => {
 };
 
 // MAINNET XRPB Token Addresses
-// TESTNET XRPB Token Addresses
 const XRPB_TOKENS = {
   solana: {
-    mint: 'FJLz7hP4EXVMVnRBtP77V4k55t2BfXuajKQp1gcwpump', // Replace with actual XRPB-SOL testnet mint
+    mint: 'FJLz7hP4EXVMVnRBtP77V4k55t2BfXuajKQp1gcwpump', // Correct mainnet mint
     decimals: 6,
-    network: 'devnet' // Changed to devnet for testing
+    network: 'mainnet-beta' // Changed to mainnet
   },
   xrpl: {
     currency: 'XRPB',
-    issuer: 'rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT', // Replace with testnet XRPB issuer
+    issuer: 'rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT',
     network: 'mainnet',
     currencyDeets: '5852504200000000000000000000000000000000'
   },
   xrplEvm: {
-    address: '0x2557C801144b11503BB524C5503AcCd48E5F54fE', // Replace with testnet XRPB contract
+    address: '0x2557C801144b11503BB524C5503AcCd48E5F54fE',
     decimals: 18,
     network: 'testnet',
-    chainId: 1449000, // Correct testnet chain ID
-    rpcUrl: 'https://rpc.testnet.xrplevm.org' // Correct testnet RPC
+    chainId: 1449000,
+    rpcUrl: 'https://rpc.testnet.xrplevm.org'
   }
 };
 
-// Payment recipient addresses (your testnet wallet addresses)
-
-
-// Update recipient for testnet
+// Payment recipient addresses (mainnet)
 const PAYMENT_RECIPIENTS = {
-  solana: '5D927MqdT7MvSGRzMGt81WRvJ5sSYEC3KpN5knQV7GsC',
+  solana: '2ZTgNc4tCnZsrvMQtRu5fJGVwkhy6ZuZaAtUgDb9dxd5', // Updated to your mainnet address
   xrpl: 'rEKpA2YoapyM8aTQGcEeCQVCaPKk1ZCCvA', 
-  xrplEvm: '0x5716dD191878F342A72633665F852bd0534B9Bc1' // Replace with your testnet wallet
+  xrplEvm: '0x5716dD191878F342A72633665F852bd0534B9Bc1'
 };
 
 /**
@@ -188,7 +184,7 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
       signature: signature,
       timestamp: new Date().toISOString(),
       explorerUrl: `https://solscan.io/tx/${signature}`,
-      network: 'mainnet'
+      network: 'mainnet-beta' // Updated to mainnet
     };
     
     localStorage.setItem(`solana_xrpb_payment_${signature}`, JSON.stringify(paymentData));

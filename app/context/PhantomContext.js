@@ -152,6 +152,7 @@ export const PhantomProvider = ({ children }) => {
 
   const wallets = useMemo(
     () => [
+      new PhantomWalletAdapter({ network }),
       new SolflareWalletAdapter({ network }),
       // Add more wallet adapters as needed
       new WalletConnectWalletAdapter({
