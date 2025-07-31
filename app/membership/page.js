@@ -341,7 +341,7 @@ export default function MembershipPage() {
               signTransaction,
               signAllTransactions
             },
-            xrpbAmount,
+            2,
             connection
           );
           break;
