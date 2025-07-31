@@ -328,18 +328,26 @@ export default function MembershipPage() {
         
         // In the handlePayment function, around line 325, replace the solana case with:
         case 'solana':
-        // Use wallet.adapter which contains the actual wallet methods
-        const walletAdapter = {
-        ...wallet.adapter,
-        publicKey: publicKey
-        };
-        
-        result = await sendSolanaXRPBPayment(
-        walletAdapter, // Pass the adapter instead of the wrapper
-        2,
-        connection
-        );
-        break;
+          // Validate wallet connection
+          if (!solanaConnected || !publicKey) {
+            throw new Error('Please connect your Phantom wallet first');
+          }
+          
+          // Create a proper wallet object with all necessary methods
+          const walletForPayment = {
+            publicKey: publicKey,
+            connected: solanaConnected,
+            signTransaction: wallet.signTransaction,
+            signAllTransactions: wallet.signAllTransactions,
+            sendTransaction: wallet.sendTransaction
+          };
+          
+          result = await sendSolanaXRPBPayment(
+            walletForPayment,
+            xrpbAmount,
+            connection
+          );
+          break;
 
         case 'xrpl':
           setPaymentResult({

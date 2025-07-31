@@ -125,18 +125,18 @@ const PAYMENT_RECIPIENTS = {
  */
 export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
   try {
-    // // Comprehensive wallet validation
-    // if (!wallet) {
-    //   throw new Error('❌ Wallet object is null or undefined');
-    // }
+    // Comprehensive wallet validation
+    if (!wallet) {
+      throw new Error('❌ Wallet object is null or undefined');
+    }
     
-    // if (!wallet.connected) {
-    //   throw new Error('❌ Solana wallet not connected');
-    // }
+    if (!wallet.connected) {
+      throw new Error('❌ Solana wallet not connected');
+    }
     
-    // if (!wallet.publicKey) {
-    //   throw new Error('❌ Wallet public key is not available');
-    // }
+    if (!wallet.publicKey) {
+      throw new Error('❌ Wallet public key is not available');
+    }
 
     console.log('🟣 SOLANA XRPB PAYMENT INITIATED (MAINNET)');
     console.log('From:', wallet.publicKey.toString());
@@ -218,7 +218,7 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     
     console.log('📝 Transaction prepared with blockhash:', blockhash);
     
-    // Enhanced wallet method detection with proper error handling
+    // Use sendTransaction method directly (preferred for Phantom)
     let signature;
     
     try {
@@ -228,15 +228,10 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
           skipPreflight: false,
           preflightCommitment: 'finalized'
         });
-      } else if (wallet.signAndSendTransaction && typeof wallet.signAndSendTransaction === 'function') {
-        console.log('📤 Using wallet.signAndSendTransaction method...');
-        signature = await wallet.signAndSendTransaction(transaction);
       } else if (wallet.signTransaction && typeof wallet.signTransaction === 'function') {
         console.log('📤 Using manual sign and send...');
         
-        // Clear any partial signatures
-        transaction.signatures = [];
-        
+        // Sign the transaction
         const signedTransaction = await wallet.signTransaction(transaction);
         
         // Verify the transaction is signed
@@ -244,12 +239,13 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
           throw new Error('Transaction was not properly signed by wallet');
         }
         
+        // Send the signed transaction
         signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
           skipPreflight: false,
           preflightCommitment: 'finalized'
         });
       } else {
-        throw new Error('❌ Wallet does not support any known transaction sending methods. Available methods: ' + Object.keys(wallet).join(', '));
+        throw new Error('❌ Wallet does not support transaction signing. Available methods: ' + Object.keys(wallet).join(', '));
       }
     } catch (walletError) {
       console.error('❌ Wallet operation failed:', walletError);
