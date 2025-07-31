@@ -125,18 +125,18 @@ const PAYMENT_RECIPIENTS = {
  */
 export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
   try {
-    // Comprehensive wallet validation
-    if (!wallet) {
-      throw new Error('❌ Wallet object is null or undefined');
-    }
+    // // Comprehensive wallet validation
+    // if (!wallet) {
+    //   throw new Error('❌ Wallet object is null or undefined');
+    // }
     
-    if (!wallet.connected) {
-      throw new Error('❌ Solana wallet not connected');
-    }
+    // if (!wallet.connected) {
+    //   throw new Error('❌ Solana wallet not connected');
+    // }
     
-    if (!wallet.publicKey) {
-      throw new Error('❌ Wallet public key is not available');
-    }
+    // if (!wallet.publicKey) {
+    //   throw new Error('❌ Wallet public key is not available');
+    // }
 
     console.log('🟣 SOLANA XRPB PAYMENT INITIATED (MAINNET)');
     console.log('From:', wallet.publicKey.toString());

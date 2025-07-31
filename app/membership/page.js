@@ -331,7 +331,7 @@ export default function MembershipPage() {
         // Use the wallet object directly from useWallet hook
         
         // Validate wallet before proceeding
-        if (!wallet.connected || !wallet.publicKey) {
+        if (!solanaConnected) {
           throw new Error('Please connect your Phantom wallet first');
         }
         
