@@ -1,5 +1,10 @@
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { 
+  getAssociatedTokenAddress, 
+  createTransferInstruction, 
+  createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID 
+} from '@solana/spl-token';
 import { ethers } from 'ethers';
 import { Client, Wallet, xrpToDrops } from 'xrpl';
 
