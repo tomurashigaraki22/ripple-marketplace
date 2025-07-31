@@ -343,7 +343,7 @@ export default function MembershipPage() {
         
         result = await sendSolanaXRPBPayment(
         walletWithPublicKey,
-        xrpbAmount,
+        2,
         connection
         );
         break;
