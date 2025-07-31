@@ -2,7 +2,7 @@ import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } f
 import { 
   getAssociatedTokenAddress, 
   createTransferInstruction, 
-  createAssociatedTokenAccountInstruction,
+  getOrCreateAssociatedTokenAccount,
   TOKEN_PROGRAM_ID 
 } from '@solana/spl-token';
 import { ethers } from 'ethers';
@@ -137,19 +137,31 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     const mintAddress = new PublicKey(XRPB_TOKENS.solana.mint);
     const recipientAddress = new PublicKey(PAYMENT_RECIPIENTS.solana);
     
-    // Get associated token accounts
+    // Get sender's associated token account
     const senderTokenAccount = await getAssociatedTokenAddress(
       mintAddress,
       wallet.publicKey
     );
     
-    const recipientTokenAccount = await getAssociatedTokenAddress(
+    // Get or create recipient's associated token account
+    // This automatically handles account creation if it doesn't exist
+    console.log('📝 Getting or creating recipient token account...');
+    const recipientTokenAccountInfo = await getOrCreateAssociatedTokenAccount(
+      connection,
+      wallet.publicKey, // payer (wallet will pay for account creation if needed)
       mintAddress,
       recipientAddress
     );
     
+    const recipientTokenAccount = recipientTokenAccountInfo.address;
+    
     // Convert amount to token units (considering decimals)
     const tokenAmount = amount * Math.pow(10, XRPB_TOKENS.solana.decimals);
+    
+    console.log('📝 Creating transfer instruction...');
+    console.log('From token account:', senderTokenAccount.toString());
+    console.log('To token account:', recipientTokenAccount.toString());
+    console.log('Token amount:', tokenAmount);
     
     // Create transfer instruction
     const transferInstruction = createTransferInstruction(
@@ -167,7 +179,7 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     // Get recent blockhash with better error handling and commitment level
     let blockhash, lastValidBlockHeight;
     try {
-      ({ blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed"));
+      ({ blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("finalized"));
       console.log('✅ Successfully fetched blockhash:', blockhash);
     } catch (blockhashError) {
       console.error('❌ Failed to fetch recent blockhash:', blockhashError);
@@ -179,9 +191,8 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     
     console.log('📝 Transaction prepared with blockhash:', blockhash);
     
-    // Sign and send transaction
-    const signedTransaction = await wallet.signTransaction(transaction);
-    const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+    // Sign and send transaction using wallet's sendTransaction method
+    const signature = await wallet.sendTransaction(transaction, connection);
     
     console.log('📤 Transaction sent with signature:', signature);
     
