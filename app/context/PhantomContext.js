@@ -3,9 +3,8 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect';
 import { clusterApiUrl, Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 
@@ -153,16 +152,10 @@ export const PhantomProvider = ({ children }) => {
     // return clusterApiUrl(network);
   }, [network]);
 
+  // Only use PhantomWalletAdapter - removed WalletConnect and Solflare
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter({ network }),
-      new SolflareWalletAdapter({ network }),
-      new WalletConnectWalletAdapter({
-        network,
-        options: {
-          projectId: '7f999d777dd494df9a3038f609665cea',
-        },
-      }),
     ],
     [network]
   );
