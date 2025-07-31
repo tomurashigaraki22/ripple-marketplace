@@ -229,7 +229,6 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
       if (wallet.sendTransaction && typeof wallet.sendTransaction === 'function') {
         console.log('📤 Using sendTransaction method...');
         signature = await wallet.sendTransaction(transaction, connection, {
-          minContextSlot,
           skipPreflight: false,
           preflightCommitment: 'finalized'
         });
