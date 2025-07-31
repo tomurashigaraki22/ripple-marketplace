@@ -14,7 +14,7 @@ export default function MembershipPage() {
   // Wallet contexts
   const { xrpWalletAddress, xrplWallet, xrpbBalance } = useXRPL()
   const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner } = useMetamask()
-  const { publicKey, connected: solanaConnected } = useWallet()
+  const { publicKey, connected: solanaConnected, wallet } = useWallet()
   const { connection } = useConnection()
 
   // Payment states
@@ -323,9 +323,13 @@ export default function MembershipPage() {
       })
 
       switch (paymentMethod.type) {
+        // At the top of the component, get the wallet object
+
+        
+        // In the handlePayment function
         case 'solana':
           result = await sendSolanaXRPBPayment(
-            { publicKey, connected: solanaConnected, signTransaction: async (tx) => tx },
+            wallet, // Pass the entire wallet object
             1,
             connection
           );

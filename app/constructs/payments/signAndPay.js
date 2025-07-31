@@ -210,23 +210,36 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     console.log('📝 Transaction prepared with blockhash:', blockhash);
     
     // Use the correct method based on wallet type
+    // Around line 213-230, replace the wallet method detection with:
     let signature;
     
+    // For PhantomWalletAdapter and other @solana/wallet-adapter wallets
     if (wallet.sendTransaction) {
-      // For @solana/wallet-adapter wallets
-      console.log('📤 Using wallet.sendTransaction method...');
-      signature = await wallet.sendTransaction(transaction, connection);
+    console.log('📤 Using wallet.sendTransaction method...');
+    signature = await wallet.sendTransaction(transaction, connection, {
+    skipPreflight: false,
+    preflightCommitment: 'finalized'
+    });
     } else if (wallet.signAndSendTransaction) {
-      // For some wallet adapters
-      console.log('📤 Using wallet.signAndSendTransaction method...');
-      signature = await wallet.signAndSendTransaction(transaction);
+    console.log('📤 Using wallet.signAndSendTransaction method...');
+    signature = await wallet.signAndSendTransaction(transaction);
     } else if (wallet.signTransaction) {
-      // Manual sign and send
-      console.log('📤 Using manual sign and send...');
-      const signedTransaction = await wallet.signTransaction(transaction);
-      signature = await connection.sendRawTransaction(signedTransaction.serialize());
+    console.log('📤 Using manual sign and send...');
+    // Ensure the transaction is properly signed
+    transaction.partialSign = undefined; // Clear any partial signatures
+    const signedTransaction = await wallet.signTransaction(transaction);
+    
+    // Verify the transaction is signed
+    if (!signedTransaction.signature) {
+    throw new Error('Transaction was not properly signed by wallet');
+    }
+    
+    signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+    skipPreflight: false,
+    preflightCommitment: 'finalized'
+    });
     } else {
-      throw new Error('❌ Wallet does not support any known transaction sending methods');
+    throw new Error('❌ Wallet does not support any known transaction sending methods');
     }
     
     console.log('📤 Transaction sent with signature:', signature);
