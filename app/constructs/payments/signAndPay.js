@@ -162,7 +162,8 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     // Get recent blockhash with better error handling and commitment level
     let blockhash, lastValidBlockHeight;
     try {
-      ({ blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized'));
+      console.log("Trying to get blockhash")
+      ({ blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed"));
       console.log('✅ Successfully fetched blockhash:', blockhash);
     } catch (blockhashError) {
       console.error('❌ Failed to fetch recent blockhash:', blockhashError);
