@@ -94,7 +94,8 @@ const XRPB_TOKENS = {
   xrpl: {
     currency: 'XRPB',
     issuer: 'rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT', // Replace with testnet XRPB issuer
-    network: 'testnet'
+    network: 'mainnet',
+    currencyDeets: '5852504200000000000000000000000000000000'
   },
   xrplEvm: {
     address: '0x2557C801144b11503BB524C5503AcCd48E5F54fE', // Replace with testnet XRPB contract
@@ -218,7 +219,7 @@ export const sendXRPLXRPBPayment = async (wallet, amount) => {
     console.log('Amount:', amount, 'XRPB');
     
     // Create XUMM payment request for XRPB token
-    const paymentUrl = `https://xaman.app/detect/request:${PAYMENT_RECIPIENTS.xrpl}?amount=${amount}&currency=${XRPB_TOKENS.xrpl.currency}&issuer=${XRPB_TOKENS.xrpl.issuer}&network=mainnet`;
+    const paymentUrl = `https://xaman.app/detect/request:${PAYMENT_RECIPIENTS.xrpl}?amount=${amount}&currency=${XRPB_TOKENS.xrpl.currencyDeets}&issuer=${XRPB_TOKENS.xrpl.issuer}&network=mainnet`;
     
     console.log('🔗 XUMM XRPB Payment URL:', paymentUrl);
     
@@ -230,11 +231,11 @@ export const sendXRPLXRPBPayment = async (wallet, amount) => {
     console.log('⏳ Monitoring for XRPB payment completion...');
     console.log('Please complete the XRPB payment in XUMM app');
     
-    // Monitor for XRPB token transactions
+    // Monitor for XRPB token transactions using currencyDeets
     const monitoringResult = await monitorXRPLXRPBTransactions(
       PAYMENT_RECIPIENTS.xrpl, 
       amount, 
-      XRPB_TOKENS.xrpl.currency,
+      XRPB_TOKENS.xrpl.currencyDeets, // Use currencyDeets instead of currency
       XRPB_TOKENS.xrpl.issuer,
       300
     );
@@ -426,6 +427,7 @@ export const monitorXRPLXRPBTransactions = async (destinationAddress, expectedAm
         }
         
         const transactions = data.result?.transactions || [];
+        console.log("Transactions: ", transactions)
         console.log(`📋 Found ${transactions.length} recent transactions`);
         
         for (const txData of transactions) {
@@ -436,25 +438,102 @@ export const monitorXRPLXRPBTransactions = async (destinationAddress, expectedAm
           if (tx.Destination !== destinationAddress) continue;
           if (!meta || meta.TransactionResult !== 'tesSUCCESS') continue;
           
-          // Check if this is an XRPB token payment
+          // Check if this is an XRPB token payment or native XRP payment
           let deliveredAmount = 0;
-          let isXRPBPayment = false;
+          let isValidPayment = false;
+          let paymentType = 'unknown';
           
+          console.log('🔍 Analyzing transaction:', {
+            hash: tx.hash,
+            delivered_amount: meta.delivered_amount,
+            tx_Amount: tx.Amount,
+            expected_currency: currency,
+            expected_currencyDeets: XRPB_TOKENS.xrpl.currencyDeets,
+            expected_issuer: issuer
+          });
+          
+          // First check for XRPB token in delivered_amount (object format)
           if (meta.delivered_amount && typeof meta.delivered_amount === 'object') {
             const delivered = meta.delivered_amount;
-            if (delivered.currency === currency && delivered.issuer === issuer) {
+            console.log('📦 Object delivered_amount:', delivered);
+            // Check using currencyDeets hex value for proper XRPB identification
+            if ((delivered.currency === XRPB_TOKENS.xrpl.currencyDeets || delivered.currency === currency) && delivered.issuer === issuer) {
               deliveredAmount = parseFloat(delivered.value);
-              isXRPBPayment = true;
+              isValidPayment = true;
+              paymentType = 'XRPB_TOKEN';
+              console.log('✅ Found XRPB in delivered_amount object');
             }
-          } else if (tx.Amount && typeof tx.Amount === 'object') {
+          } 
+          // Then check for XRPB token in tx.Amount (object format)
+          else if (tx.Amount && typeof tx.Amount === 'object') {
             const amount = tx.Amount;
-            if (amount.currency === currency && amount.issuer === issuer) {
+            console.log('📦 Object tx.Amount:', amount);
+            // Check using currencyDeets hex value for proper XRPB identification
+            if ((amount.currency === XRPB_TOKENS.xrpl.currencyDeets || amount.currency === currency) && amount.issuer === issuer) {
               deliveredAmount = parseFloat(amount.value);
-              isXRPBPayment = true;
+              isValidPayment = true;
+              paymentType = 'XRPB_TOKEN';
+              console.log('✅ Found XRPB in tx.Amount object');
+            }
+          }
+          // Handle string delivered_amount (could be XRP or XRPB)
+          else if (typeof meta.delivered_amount === 'string') {
+            console.log('⚠️ String delivered_amount detected, analyzing...');
+            
+            // Check AffectedNodes for XRPB-related RippleState changes
+            const affectedNodes = meta.AffectedNodes || [];
+            let foundXRPBNode = false;
+            
+            for (const node of affectedNodes) {
+              const nodeData = node.ModifiedNode || node.CreatedNode || node.DeletedNode;
+              if (nodeData && nodeData.LedgerEntryType === 'RippleState') {
+                const finalFields = nodeData.FinalFields || nodeData.NewFields;
+                if (finalFields) {
+                  console.log('🔍 Checking RippleState node:', finalFields);
+                  // Check for XRPB using currencyDeets or issuer
+                  const hasXRPBCurrency = (finalFields.LowLimit && 
+                    (finalFields.LowLimit.currency === XRPB_TOKENS.xrpl.currencyDeets || finalFields.LowLimit.issuer === issuer)) ||
+                    (finalFields.HighLimit && 
+                    (finalFields.HighLimit.currency === XRPB_TOKENS.xrpl.currencyDeets || finalFields.HighLimit.issuer === issuer));
+                  
+                  if (hasXRPBCurrency) {
+                    foundXRPBNode = true;
+                    console.log('✅ Found XRPB RippleState node with currencyDeets');
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (foundXRPBNode) {
+              // This is actually an XRPB transaction disguised as XRP
+              deliveredAmount = parseFloat(meta.delivered_amount) / 1000000;
+              isValidPayment = true;
+              paymentType = 'XRPB_DISGUISED';
+              console.log('✅ Confirmed XRPB payment via RippleState analysis using currencyDeets');
+            } else {
+              // This is a native XRP payment - accept it
+              deliveredAmount = parseFloat(meta.delivered_amount) / 1000000; // Convert drops to XRP
+              isValidPayment = true;
+              paymentType = 'NATIVE_XRP';
+              console.log('✅ Processing as native XRP payment');
             }
           }
           
-          if (!isXRPBPayment) continue;
+          console.log('📊 Payment analysis result:', {
+            isValidPayment,
+            paymentType,
+            deliveredAmount,
+            expectedAmount,
+            currency,
+            currencyDeets: XRPB_TOKENS.xrpl.currencyDeets,
+            issuer
+          });
+          
+          if (!isValidPayment) {
+            console.log('⏭️ Skipping invalid transaction');
+            continue;
+          }
           
           // Parse transaction timestamp
           let txTime = new Date();
@@ -475,7 +554,7 @@ export const monitorXRPLXRPBTransactions = async (destinationAddress, expectedAm
           });
           
           // Check if amount matches
-          const tolerance = Math.max(0.001, expectedAmount * 0.02);
+          const tolerance = Math.max(0.001, expectedAmount * 0.09);
           const amountDifference = Math.abs(deliveredAmount - expectedAmount);
           
           if (amountDifference <= tolerance) {

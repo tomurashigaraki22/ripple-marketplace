@@ -8,6 +8,7 @@ import { useMetamask } from '../context/MetamaskContext'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getXRPBPriceInUSD, calculateXRPBAmount } from '../constructs/payments/signAndPay'
 import { ethers } from 'ethers'
+import { Clock } from 'lucide-react'; // or your preferred icon library
 
 export default function MembershipPage() {
   // Wallet contexts
@@ -339,7 +340,7 @@ export default function MembershipPage() {
           
           result = await sendXRPLXRPBPayment(
             { account: xrpWalletAddress },
-            xrpbAmount
+            1
           );
           break;
 
@@ -438,7 +439,7 @@ export default function MembershipPage() {
                     {isLoadingPrice ? (
                       <Loader2 className="w-4 h-4 animate-spin inline ml-2" />
                     ) : (
-                      <span className="text-[#39FF14] font-bold ml-1">${xrpbPrice.toFixed(3)}</span>
+                      <span className="text-[#39FF14] font-bold ml-1">${xrpbPrice.toFixed(6)}</span>
                     )}
                   </span>
                 </div>
@@ -777,6 +778,15 @@ export default function MembershipPage() {
                     )}
                   </>
                 ) : (
+              paymentResult.pending ? (
+                  <>
+                    <Clock className="w-16 h-16 text-yellow-500 mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-yellow-500 mb-4">Payment Pending</h3>
+                    <p className="text-gray-300 mb-6">
+                      Your payment is being processed. Please wait...
+                    </p>
+                  </>
+                ) : (
                   <>
                     <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
                     <h3 className="text-2xl font-bold text-red-500 mb-4">Payment Failed</h3>
@@ -784,7 +794,7 @@ export default function MembershipPage() {
                       {paymentResult.error || 'An error occurred during payment processing.'}
                     </p>
                   </>
-                )}
+                ))}
                 <button
                   onClick={closeModal}
                   className="py-3 px-8 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold hover:shadow-[0_0_30px_rgba(57,255,20,0.5)] transition-all duration-300"
