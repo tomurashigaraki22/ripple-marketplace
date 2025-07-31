@@ -143,24 +143,34 @@ export const PhantomProvider = ({ children }) => {
   // Set to mainnet-beta for production
   const network = WalletAdapterNetwork.Mainnet;
 
-  // Use mainnet RPC endpoint
+  // Use a more reliable RPC endpoint
   const endpoint = useMemo(() => {
-    // You can use a custom RPC endpoint for better performance
-    // return 'https://your-custom-rpc-endpoint.com';
-    return clusterApiUrl(network);
+    // Option 1: Use Helius (recommended for production)
+    // return 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY';
+    
+    // Option 2: Use QuickNode (also reliable)
+    // return 'https://your-quicknode-endpoint.solana-mainnet.quiknode.pro/YOUR_API_KEY/';
+    
+    // Option 3: Use Alchemy (good alternative)
+    // return 'https://solana-mainnet.g.alchemy.com/v2/YOUR_API_KEY';
+    
+    // Option 4: Use a free but more reliable endpoint
+    return 'https://api.mainnet-beta.solana.com';
+    
+    // Fallback to default if others fail
+    // return clusterApiUrl(network);
   }, [network]);
 
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter({ network }),
       new SolflareWalletAdapter({ network }),
-      // Add more wallet adapters as needed
       new WalletConnectWalletAdapter({
-      network,
-      options: {
-        projectId: '7f999d777dd494df9a3038f609665cea', // Get from https://cloud.walletconnect.com
-      },
-    }),
+        network,
+        options: {
+          projectId: '7f999d777dd494df9a3038f609665cea',
+        },
+      }),
     ],
     [network]
   );
