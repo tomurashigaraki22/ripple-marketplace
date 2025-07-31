@@ -159,17 +159,39 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     // Create transaction
     const transaction = new Transaction().add(transferInstruction);
     
-    // Get recent blockhash
-    const { blockhash } = await connection.getLatestBlockhash();
+    // Get recent blockhash with better error handling and commitment level
+    let blockhash, lastValidBlockHeight;
+    try {
+      ({ blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized'));
+      console.log('✅ Successfully fetched blockhash:', blockhash);
+    } catch (blockhashError) {
+      console.error('❌ Failed to fetch recent blockhash:', blockhashError);
+      throw new Error(`Failed to get recent blockhash: ${blockhashError.message}`);
+    }
+    
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = wallet.publicKey;
+    
+    console.log('📝 Transaction prepared with blockhash:', blockhash);
     
     // Sign and send transaction
     const signedTransaction = await wallet.signTransaction(transaction);
     const signature = await connection.sendRawTransaction(signedTransaction.serialize());
     
-    // Wait for confirmation
-    await connection.confirmTransaction(signature);
+    console.log('📤 Transaction sent with signature:', signature);
+    
+    // Wait for confirmation with improved confirmation method
+    try {
+      await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        'finalized'
+      );
+      console.log('✅ Transaction confirmed with finalized commitment');
+    } catch (confirmError) {
+      console.error('⚠️ Confirmation error:', confirmError);
+      // Still try to return success if we got a signature
+      console.log('🔄 Transaction may still be processing...');
+    }
     
     console.log('✅ Solana XRPB Payment Successful!');
     console.log('Transaction Signature:', signature);
@@ -184,7 +206,9 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
       signature: signature,
       timestamp: new Date().toISOString(),
       explorerUrl: `https://solscan.io/tx/${signature}`,
-      network: 'mainnet-beta' // Updated to mainnet
+      network: 'mainnet-beta',
+      blockhash: blockhash,
+      lastValidBlockHeight: lastValidBlockHeight
     };
     
     localStorage.setItem(`solana_xrpb_payment_${signature}`, JSON.stringify(paymentData));

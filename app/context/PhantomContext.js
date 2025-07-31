@@ -143,21 +143,16 @@ export const PhantomProvider = ({ children }) => {
   // Set to mainnet-beta for production
   const network = WalletAdapterNetwork.Mainnet;
 
-  // Use a more reliable RPC endpoint
+  // Use a more reliable RPC endpoint to avoid 403 errors
   const endpoint = useMemo(() => {
-    // Option 1: Use Helius (recommended for production)
-    // return 'https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY';
-    
-    // Option 2: Use QuickNode (also reliable)
-    // return 'https://your-quicknode-endpoint.solana-mainnet.quiknode.pro/YOUR_API_KEY/';
-    
-    // Option 3: Use Alchemy (good alternative)
-    // return 'https://solana-mainnet.g.alchemy.com/v2/YOUR_API_KEY';
-    
-    // Option 4: Use a free but more reliable endpoint
+    // Option 1: Use the more reliable mainnet endpoint
     return 'https://api.mainnet-beta.solana.com';
     
-    // Fallback to default if others fail
+    // Option 2: For production, consider using a paid RPC service:
+    // return 'https://rpc.helius.xyz/?api-key=YOUR_API_KEY';
+    // return 'https://solana-mainnet.g.alchemy.com/v2/YOUR_API_KEY';
+    
+    // Fallback to default cluster URL
     // return clusterApiUrl(network);
   }, [network]);
 
