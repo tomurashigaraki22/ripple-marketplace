@@ -14,7 +14,7 @@ export default function MembershipPage() {
   // Wallet contexts
   const { xrpWalletAddress, xrplWallet, xrpbBalance } = useXRPL()
   const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner } = useMetamask()
-  const { publicKey, connected: solanaConnected, wallet } = useWallet()
+  const { publicKey, connected: solanaConnected, wallet, sendTransaction, signTransaction, signAllTransactions } = useWallet()
   const { connection } = useConnection()
 
   // Payment states
@@ -333,18 +333,15 @@ export default function MembershipPage() {
             throw new Error('Please connect your Phantom wallet first');
           }
           
-          // Create a proper wallet object with all necessary methods
-          const walletForPayment = {
-            publicKey: publicKey,
-            connected: solanaConnected,
-            signTransaction: wallet.signTransaction,
-            signAllTransactions: wallet.signAllTransactions,
-            sendTransaction: wallet.sendTransaction
-          };
-          
           result = await sendSolanaXRPBPayment(
-            walletForPayment,
-            2,
+            {
+              publicKey,
+              connected: solanaConnected,
+              sendTransaction,
+              signTransaction,
+              signAllTransactions
+            },
+            xrpbAmount,
             connection
           );
           break;

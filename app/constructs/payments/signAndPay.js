@@ -205,47 +205,36 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     
     // Get recent blockhash with better error handling and commitment level
     let blockhash, lastValidBlockHeight;
+
     try {
-      ({ blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("finalized"));
+      const latest = await connection.getLatestBlockhashAndContext("finalized");
+      blockhash = latest.value.blockhash;
+      lastValidBlockHeight = latest.value.lastValidBlockHeight;
       console.log('✅ Successfully fetched blockhash:', blockhash);
     } catch (blockhashError) {
       console.error('❌ Failed to fetch recent blockhash:', blockhashError);
       throw new Error(`Failed to get recent blockhash: ${blockhashError.message}`);
     }
-    
+
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = wallet.publicKey;
-    
+
+        
     console.log('📝 Transaction prepared with blockhash:', blockhash);
     
-    // Use sendTransaction method directly (preferred for Phantom)
+    // Use sendTransaction method directly (destructured from useWallet)
     let signature;
     
     try {
       if (wallet.sendTransaction && typeof wallet.sendTransaction === 'function') {
-        console.log('📤 Using wallet.sendTransaction method...');
+        console.log('📤 Using sendTransaction method...');
         signature = await wallet.sendTransaction(transaction, connection, {
-          skipPreflight: false,
-          preflightCommitment: 'finalized'
-        });
-      } else if (wallet.signTransaction && typeof wallet.signTransaction === 'function') {
-        console.log('📤 Using manual sign and send...');
-        
-        // Sign the transaction
-        const signedTransaction = await wallet.signTransaction(transaction);
-        
-        // Verify the transaction is signed
-        if (!signedTransaction || !signedTransaction.signatures || signedTransaction.signatures.length === 0) {
-          throw new Error('Transaction was not properly signed by wallet');
-        }
-        
-        // Send the signed transaction
-        signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+          minContextSlot,
           skipPreflight: false,
           preflightCommitment: 'finalized'
         });
       } else {
-        throw new Error('❌ Wallet does not support transaction signing. Available methods: ' + Object.keys(wallet).join(', '));
+        throw new Error('❌ sendTransaction method not available. Available methods: ' + Object.keys(wallet).join(', '));
       }
     } catch (walletError) {
       console.error('❌ Wallet operation failed:', walletError);
@@ -254,16 +243,16 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     
     console.log('📤 Transaction sent with signature:', signature);
     
-    // Wait for confirmation with improved confirmation method
+    // Wait for confirmation
     try {
-      await connection.confirmTransaction(
-        { signature, blockhash, lastValidBlockHeight },
-        'finalized'
-      );
-      console.log('✅ Transaction confirmed with finalized commitment');
+      await connection.confirmTransaction({
+        blockhash,
+        lastValidBlockHeight,
+        signature
+      });
+      console.log('✅ Transaction confirmed');
     } catch (confirmError) {
       console.error('⚠️ Confirmation error:', confirmError);
-      // Still try to return success if we got a signature
       console.log('🔄 Transaction may still be processing...');
     }
     
