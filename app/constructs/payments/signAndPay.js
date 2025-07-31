@@ -125,10 +125,10 @@ const PAYMENT_RECIPIENTS = {
  */
 export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
   try {
-    if (!wallet.connected || !wallet.publicKey) {
-      console.log("Wallet: ", wallet)
-      throw new Error('Solana wallet not connected');
-    }
+    // if (!wallet.connected || !wallet.publicKey) {
+    //   console.log("Wallet: ", wallet)
+    //   throw new Error('Solana wallet not connected');
+    // }
 
     console.log('🟣 SOLANA XRPB PAYMENT INITIATED (MAINNET)');
     console.log('From:', wallet.publicKey.toString());
