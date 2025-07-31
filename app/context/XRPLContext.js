@@ -11,9 +11,10 @@ export const XRPLProvider = ({ children }) => {
   const [xrpWalletAddress, setXrpWalletAddress] = useState(null);
   const [xrplWallet, setXrplWallet] = useState(null);
   const [xrpBalance, setXrpBalance] = useState(0);
+  const [xrpbBalance, setXrpbBalance] = useState(0);
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Initialize XUMM
+  // Initialize XUMM for mainnet
   const xumm = new XummPkce('6f42c09e-9637-49f2-8d90-d79f89b9d437', {
     redirectUrl: typeof window !== 'undefined' ? window.location.origin : '',
     rememberJwt: true,
@@ -21,7 +22,7 @@ export const XRPLProvider = ({ children }) => {
     implicit: true
   });
 
-  // Utility function to get XRP balance
+  // Utility function to get XRP balance (mainnet)
   const getXrpBalance = async (address) => {
     try {
       const response = await fetch(`https://api.xrpscan.com/api/v1/account/${address}`);
@@ -29,6 +30,27 @@ export const XRPLProvider = ({ children }) => {
       return parseFloat(data.xrpBalance || 0);
     } catch (error) {
       console.error('Error fetching XRP balance:', error);
+      return 0;
+    }
+  };
+
+  // Utility function to get XRPB token balance
+  const getXrpbBalance = async (address) => {
+    try {
+      // Replace with actual XRPB token details
+      const XRPB_CURRENCY = 'XRPB';
+      const XRPB_ISSUER = 'YOUR_XRPB_ISSUER_ADDRESS'; // Replace with actual issuer
+      
+      const response = await fetch(`https://api.xrpscan.com/api/v1/account/${address}/balances`);
+      const data = await response.json();
+      
+      const xrpbToken = data.find(token => 
+        token.currency === XRPB_CURRENCY && token.issuer === XRPB_ISSUER
+      );
+      
+      return parseFloat(xrpbToken?.value || 0);
+    } catch (error) {
+      console.error('Error fetching XRPB balance:', error);
       return 0;
     }
   };
@@ -51,8 +73,12 @@ export const XRPLProvider = ({ children }) => {
       setXrpWalletAddress(state.me.account);
       localStorage.setItem(LOCAL_KEY, JSON.stringify(walletData));
 
-      const balance = await getXrpBalance(state.me.account);
-      setXrpBalance(balance);
+      // Fetch both XRP and XRPB balances
+      const xrpBal = await getXrpBalance(state.me.account);
+      const xrpbBal = await getXrpbBalance(state.me.account);
+      
+      setXrpBalance(xrpBal);
+      setXrpbBalance(xrpbBal);
       setCurrentStep(2);
       
       return walletData;
@@ -66,13 +92,13 @@ export const XRPLProvider = ({ children }) => {
     setXrpWalletAddress(null);
     setXrplWallet(null);
     setXrpBalance(0);
+    setXrpbBalance(0);
     localStorage.removeItem(LOCAL_KEY);
     setCurrentStep(1);
   };
 
   // Initialize and handle XUMM events
   useEffect(() => {
-    // Handle OAuth redirect and events
     xumm.on("success", async () => {
       try {
         const state = await xumm.state();
@@ -87,8 +113,11 @@ export const XRPLProvider = ({ children }) => {
         setXrpWalletAddress(state.me.account);
         localStorage.setItem(LOCAL_KEY, JSON.stringify(walletData));
 
-        const balance = await getXrpBalance(state.me.account);
-        setXrpBalance(balance);
+        const xrpBal = await getXrpBalance(state.me.account);
+        const xrpbBal = await getXrpbBalance(state.me.account);
+        
+        setXrpBalance(xrpBal);
+        setXrpbBalance(xrpbBal);
         setCurrentStep(2);
       } catch (err) {
         console.error("Error processing success:", err);
@@ -106,14 +135,16 @@ export const XRPLProvider = ({ children }) => {
         const walletData = JSON.parse(savedWallet);
         setXrplWallet(walletData);
         setXrpWalletAddress(walletData.address);
+        
+        // Fetch current balances
         getXrpBalance(walletData.address).then(setXrpBalance);
+        getXrpbBalance(walletData.address).then(setXrpbBalance);
       } catch (error) {
         console.error("Error loading saved wallet:", error);
         localStorage.removeItem(LOCAL_KEY);
       }
     }
 
-    // Check for xummAuthToken in URL
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const authToken = urlParams.get('xummAuthToken');
@@ -131,11 +162,13 @@ export const XRPLProvider = ({ children }) => {
     xrpWalletAddress,
     xrplWallet,
     xrpBalance,
+    xrpbBalance,
     connectXrpWallet,
     disconnectXrpWallet,
     currentStep,
     setCurrentStep,
     getXrpBalance,
+    getXrpbBalance,
   };
 
   return (

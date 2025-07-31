@@ -35,7 +35,7 @@ export default function HomePage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
-            <Link
+            {/* <Link
               href="/claim"
               className="group relative px-10 py-5 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold text-lg hover:shadow-[0_0_40px_rgba(57,255,20,0.6)] transition-all duration-300 transform hover:scale-105 overflow-hidden"
             >
@@ -44,7 +44,7 @@ export default function HomePage() {
                 <Coins className="w-5 h-5" />
                 Claim Tokens
               </span>
-            </Link>
+            </Link> */}
             
             <Link
               href="/wallet"

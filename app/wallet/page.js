@@ -9,7 +9,6 @@ import { Wallet, Copy, Globe, CheckCircle, AlertCircle, ExternalLink, TrendingUp
 import { WalletProvider, ConnectionProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import {
-  // Remove PhantomWalletAdapter import
   SolflareWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl } from '@solana/web3.js';
@@ -19,7 +18,6 @@ export default function WalletPage() {
   const {
     xrpWalletAddress,
     xrplWallet,
-    xrpBalance,
     connectXrpWallet,
     disconnectXrpWallet,
   } = useXRPL()
@@ -45,47 +43,11 @@ export default function WalletPage() {
   const { connection } = useConnection()
   
   const phantomWalletAddress = publicKey?.toString()
-  const [solanaBalance, setSolanaBalance] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-
-  // Fetch Solana balance when connected
-  useEffect(() => {
-    const fetchSolanaBalance = async () => {
-      if (publicKey && connection) {
-        try {
-          setIsLoading(true)
-          const balance = await connection.getBalance(publicKey)
-          setSolanaBalance(balance / 1000000000) // Convert lamports to SOL
-        } catch (error) {
-          console.error('Error fetching Solana balance:', error)
-          setSolanaBalance(0)
-        } finally {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    fetchSolanaBalance()
-  }, [publicKey, connection])
-
-  const [balance, setBalance] = useState({
-    xrpb: 1250.75,
-    xrp: xrpBalance || 0,
-    sol: solanaBalance || 0,
-    eth: 0.5,
-  })
-
-  useEffect(() => {
-    setBalance(prev => ({
-      ...prev,
-      xrp: xrpBalance || 0,
-      sol: solanaBalance || 0,
-    }))
-  }, [xrpBalance, solanaBalance])
 
   const wallets2 = [
     {
-      name: "XUMM",
+      name: "XAMAN",
       chain: "XRP Ledger",
       icon: "🔷",
       address: xrpWalletAddress,
@@ -93,8 +55,9 @@ export default function WalletPage() {
       connectFn: connectXrpWallet,
       disconnectFn: disconnectXrpWallet,
       connecting: false,
-      description: "Connect to XRP Ledger for fast, low-cost transactions",
-      color: "from-blue-500 to-cyan-500"
+      description: "Connect to XRP Ledger for XRPB transactions",
+      color: "from-blue-500 to-cyan-500",
+      token: "XRPB"
     },
     {
       name: "MetaMask",
@@ -105,8 +68,9 @@ export default function WalletPage() {
       connectFn: connectMetamaskWallet,
       disconnectFn: disconnectMetamaskWallet,
       connecting: connecting,
-      description: "Access Ethereum and EVM-compatible networks",
-      color: "from-orange-500 to-amber-500"
+      description: "Access XRPL EVM Sidechain for XRPB transactions",
+      color: "from-orange-500 to-amber-500",
+      token: "XRPB"
     },
     {
       name: "Solflare",
@@ -117,8 +81,9 @@ export default function WalletPage() {
       connectFn: null,
       disconnectFn: null,
       connecting: phantomConnecting,
-      description: "Connect to Solana for high-speed, low-fee transactions",
-      color: "from-purple-500 to-pink-500"
+      description: "Connect to Solana for XRPB-SOL transactions",
+      color: "from-purple-500 to-pink-500",
+      token: "XRPB-SOL"
     },
   ]
 
@@ -153,7 +118,6 @@ export default function WalletPage() {
 
   const copyAddress = (address) => {
     navigator.clipboard.writeText(address)
-    // Better notification instead of alert
     const notification = document.createElement('div')
     notification.className = 'fixed top-4 right-4 bg-[#39FF14] text-black px-4 py-2 rounded-lg font-medium z-50 animate-bounce'
     notification.textContent = 'Address copied!'
@@ -163,7 +127,6 @@ export default function WalletPage() {
 
   const connectedWallets = wallets2.filter(w => w.connected)
   const hasConnectedWallet = connectedWallets.length > 0
-  const totalPortfolioValue = balance.xrpb + (balance.xrp * 0.5) + (balance.sol * 20) + (balance.eth * 2000)
 
   return (
     <ConnectionProvider endpoint={endpoint}>
@@ -205,17 +168,13 @@ export default function WalletPage() {
                 </p>
               </div>
 
-              {/* Portfolio Overview */}
+              {/* Connected Wallets Overview */}
               {hasConnectedWallet && (
                 <div className="bg-gradient-to-r from-black/60 via-gray-900/60 to-black/60 backdrop-blur-xl border border-[#39FF14]/30 rounded-3xl p-8 mb-12 shadow-2xl shadow-[#39FF14]/10">
                   <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center space-x-3">
                       <TrendingUp className="w-8 h-8 text-[#39FF14]" />
-                      <h2 className="text-3xl font-bold text-white">Portfolio Overview</h2>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-400">Total Value</p>
-                      <p className="text-2xl font-bold text-[#39FF14]">${totalPortfolioValue.toLocaleString()}</p>
+                      <h2 className="text-3xl font-bold text-white">Wallet Overview</h2>
                     </div>
                   </div>
 
@@ -262,30 +221,21 @@ export default function WalletPage() {
                       ))}
                     </div>
 
-                    {/* Token Balances */}
+                    {/* Supported Tokens */}
                     <div className="space-y-6">
-                      <h3 className="text-xl font-semibold text-white mb-4">Token Balances</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-6 rounded-2xl bg-gradient-to-br from-[#39FF14]/20 to-emerald-400/20 border border-[#39FF14]/30 hover:shadow-lg hover:shadow-[#39FF14]/20 transition-all duration-300">
-                          <p className="text-sm text-gray-300 mb-2">XRPB</p>
-                          <p className="text-3xl font-bold text-[#39FF14]">{balance.xrpb.toLocaleString()}</p>
-                          <p className="text-xs text-gray-400 mt-1">Platform Token</p>
-                        </div>
-                        <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300">
-                          <p className="text-sm text-gray-300 mb-2">XRP</p>
-                          <p className="text-2xl font-semibold text-white">{balance.xrp.toFixed(2)}</p>
-                          <p className="text-xs text-gray-400 mt-1">${(balance.xrp * 0.5).toFixed(2)}</p>
-                        </div>
-                        <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300">
-                          <p className="text-sm text-gray-300 mb-2">SOL</p>
-                          <p className="text-2xl font-semibold text-white">{balance.sol.toFixed(4)}</p>
-                          <p className="text-xs text-gray-400 mt-1">${(balance.sol * 20).toFixed(2)}</p>
-                        </div>
-                        <div className="p-6 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300">
-                          <p className="text-sm text-gray-300 mb-2">ETH</p>
-                          <p className="text-2xl font-bold text-white">{balance.eth.toFixed(4)}</p>
-                          <p className="text-xs text-gray-400 mt-1">${(balance.eth * 2000).toFixed(2)}</p>
-                        </div>
+                      <h3 className="text-xl font-semibold text-white mb-4">Supported Tokens</h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        {connectedWallets.map((wallet) => (
+                          <div key={wallet.name} className="p-6 rounded-2xl bg-gradient-to-br from-[#39FF14]/20 to-emerald-400/20 border border-[#39FF14]/30 hover:shadow-lg hover:shadow-[#39FF14]/20 transition-all duration-300">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-lg font-bold text-[#39FF14]">{wallet.token}</p>
+                                <p className="text-sm text-gray-300">{wallet.chain}</p>
+                              </div>
+                              <div className="text-2xl">{wallet.icon}</div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -316,7 +266,10 @@ export default function WalletPage() {
                       </div>
                       <h3 className="text-2xl font-bold text-white mb-2">{wallet.name}</h3>
                       <p className="text-sm text-gray-400 mb-2">{wallet.chain}</p>
-                      <p className="text-xs text-gray-500 mb-6 leading-relaxed">{wallet.description}</p>
+                      <p className="text-xs text-gray-500 mb-4 leading-relaxed">{wallet.description}</p>
+                      <div className="mb-6 p-3 bg-[#39FF14]/10 rounded-xl border border-[#39FF14]/30">
+                        <p className="text-sm font-semibold text-[#39FF14]">Token: {wallet.token}</p>
+                      </div>
                       
                       {wallet.connected ? (
                         <div className="space-y-4">
@@ -377,14 +330,14 @@ export default function WalletPage() {
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold text-white mb-6">Getting Started</h2>
                 <p className="text-xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-                  Connect your preferred wallets to unlock the full potential of cross-chain trading on RippleBids
+                  Connect your preferred wallets to unlock cross-chain XRPB trading on RippleBids
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {[
                     {
                       step: "1",
-                      title: "Choose Your Wallet",
-                      description: "Select from XUMM (XRP Ledger), MetaMask (Ethereum/EVM), or Solflare (Solana) based on your preferred blockchain",
+                      title: "Choose Your Chain",
+                      description: "Select from XRPL (XRPB), XRPL EVM (XRPB), or Solana (XRPB-SOL) based on your preferred blockchain",
                       icon: <Wallet className="w-8 h-8" />
                     },
                     {
@@ -396,7 +349,7 @@ export default function WalletPage() {
                     {
                       step: "3",
                       title: "Start Trading",
-                      description: "Access the marketplace, place bids, and trade across multiple blockchains with your connected wallets",
+                      description: "Access the marketplace and trade with XRPB tokens across multiple blockchains with your connected wallets",
                       icon: <ExternalLink className="w-8 h-8" />
                     }
                   ].map((item, index) => (

@@ -1,51 +1,166 @@
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { ethers } from 'ethers';
 import { Client, Wallet, xrpToDrops } from 'xrpl';
 
-// Generate random addresses for each blockchain
-const generateRandomAddresses = () => {
-  // Random Solana address (base58 format)
-  const solanaAddress = 'HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH';
-  
-  // Random Ethereum address with proper checksum using ethers.getAddress()
-  const evmAddress = "0x6b99ee5baa3b235ffb3d572a70ca79cde097aa94";
-  
-  // Random XRP address
-  const xrpAddress = 'rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH';
-  
-  return { solanaAddress, evmAddress, xrpAddress };
-};
+// XRPL EVM RPC URL
+const RPC_URL = "https://rpc.xrplevm.org";
 
-const { solanaAddress, evmAddress, xrpAddress } = generateRandomAddresses();
+// XRPB/XRP pair contract on XRiSE33
+const PAIR_ADDRESS = "0x8f03556589d2DCA2437661c37759f5959a92493D";
+
+// Minimal ABI to fetch reserves and tokens
+const PAIR_ABI = [
+  "function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)",
+  "function token0() view returns (address)",
+  "function token1() view returns (address)"
+];
+
+// XRPB token address
+const XRPB_ADDRESS = "0x6d8630D167458b337A2c8b6242c354d2f4f75D96";
 
 /**
- * Solana Payment Helper Function
- * @param {Object} wallet - Connected Solana wallet
- * @param {number} amount - Amount in SOL to send
- * @param {Connection} connection - Solana connection object
+ * Fetch XRPB price in USD from XRPL EVM pair contract
+ * @returns {Promise<number|null>} XRPB price in USD or null if error
  */
-export const sendSolanaPayment = async (wallet, amount = 0.01, connection) => {
+export const getXRPBPriceInUSD = async () => {
   try {
-    if (!wallet.connected || !wallet.publicKey) {
-      throw new Error('Wallet not connected');
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const pair = new ethers.Contract(PAIR_ADDRESS, PAIR_ABI, provider);
+
+    // Get token ordering in the pair
+    const token0 = await pair.token0();
+    const token1 = await pair.token1();
+
+    const [reserve0, reserve1] = await pair.getReserves();
+
+    // Determine which reserve is XRPB and which is XRP
+    let reserveXRPB, reserveXRP;
+    if (token0.toLowerCase() === XRPB_ADDRESS.toLowerCase()) {
+      reserveXRPB = reserve0;
+      reserveXRP = reserve1;
+    } else {
+      reserveXRPB = reserve1;
+      reserveXRP = reserve0;
     }
 
-    console.log('🟣 SOLANA PAYMENT INITIATED');
-    console.log('From:', wallet.publicKey.toString());
-    console.log('To:', solanaAddress);
-    console.log('Amount:', amount, 'SOL');
+    // Calculate price of 1 XRPB in XRP
+    const priceInXRP = Number(reserveXRP) / Number(reserveXRPB);
+
+    // Get XRP price in USD from CoinGecko
+    const response = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd"
+    );
     
-    const recipientPubKey = new PublicKey(solanaAddress);
-    const lamports = amount * LAMPORTS_PER_SOL;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const xrpUsd = data.ripple.usd;
+
+    // Final XRPB price in USD
+    const xrpbUsd = priceInXRP * xrpUsd;
+
+    console.log(`XRPB Price in USD: $${xrpbUsd.toFixed(6)}`);
+    return xrpbUsd;
+  } catch (error) {
+    console.error("Error fetching XRPB price:", error.message);
+    return null;
+  }
+};
+
+/**
+ * Calculate XRPB amount needed for USD payment
+ * @param {number} usdAmount - Amount in USD
+ * @param {number} xrpbPrice - XRPB price in USD
+ * @returns {number} XRPB amount needed
+ */
+export const calculateXRPBAmount = (usdAmount, xrpbPrice) => {
+  if (!xrpbPrice || xrpbPrice <= 0) {
+    throw new Error('Invalid XRPB price');
+  }
+  return Math.ceil(usdAmount / xrpbPrice); // Round up to ensure sufficient payment
+};
+
+// MAINNET XRPB Token Addresses
+// TESTNET XRPB Token Addresses
+const XRPB_TOKENS = {
+  solana: {
+    mint: 'FJLz7hP4EXVMVnRBtP77V4k55t2BfXuajKQp1gcwpump', // Replace with actual XRPB-SOL testnet mint
+    decimals: 6,
+    network: 'devnet' // Changed to devnet for testing
+  },
+  xrpl: {
+    currency: 'XRPB',
+    issuer: 'rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT', // Replace with testnet XRPB issuer
+    network: 'testnet'
+  },
+  xrplEvm: {
+    address: '0x2557C801144b11503BB524C5503AcCd48E5F54fE', // Replace with testnet XRPB contract
+    decimals: 18,
+    network: 'testnet',
+    chainId: 1449000, // Correct testnet chain ID
+    rpcUrl: 'https://rpc.testnet.xrplevm.org' // Correct testnet RPC
+  }
+};
+
+// Payment recipient addresses (your testnet wallet addresses)
+
+
+// Update recipient for testnet
+const PAYMENT_RECIPIENTS = {
+  solana: '5D927MqdT7MvSGRzMGt81WRvJ5sSYEC3KpN5knQV7GsC',
+  xrpl: 'rEKpA2YoapyM8aTQGcEeCQVCaPKk1ZCCvA', 
+  xrplEvm: '0x5716dD191878F342A72633665F852bd0534B9Bc1' // Replace with your testnet wallet
+};
+
+/**
+ * Solana XRPB-SOL Payment Function
+ * @param {Object} wallet - Connected Solana wallet
+ * @param {number} amount - Amount in XRPB-SOL tokens
+ * @param {Connection} connection - Solana connection object
+ */
+export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
+  try {
+    if (!wallet.connected || !wallet.publicKey) {
+      throw new Error('Solana wallet not connected');
+    }
+
+    console.log('🟣 SOLANA XRPB PAYMENT INITIATED (MAINNET)');
+    console.log('From:', wallet.publicKey.toString());
+    console.log('To:', PAYMENT_RECIPIENTS.solana);
+    console.log('Amount:', amount, 'XRPB-SOL');
+    
+    const mintAddress = new PublicKey(XRPB_TOKENS.solana.mint);
+    const recipientAddress = new PublicKey(PAYMENT_RECIPIENTS.solana);
+    
+    // Get associated token accounts
+    const senderTokenAccount = await getAssociatedTokenAddress(
+      mintAddress,
+      wallet.publicKey
+    );
+    
+    const recipientTokenAccount = await getAssociatedTokenAddress(
+      mintAddress,
+      recipientAddress
+    );
+    
+    // Convert amount to token units (considering decimals)
+    const tokenAmount = amount * Math.pow(10, XRPB_TOKENS.solana.decimals);
+    
+    // Create transfer instruction
+    const transferInstruction = createTransferInstruction(
+      senderTokenAccount,
+      recipientTokenAccount,
+      wallet.publicKey,
+      tokenAmount,
+      [],
+      TOKEN_PROGRAM_ID
+    );
     
     // Create transaction
-    const transaction = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: wallet.publicKey,
-        toPubkey: recipientPubKey,
-        lamports: lamports,
-      })
-    );
+    const transaction = new Transaction().add(transferInstruction);
     
     // Get recent blockhash
     const { blockhash } = await connection.getLatestBlockhash();
@@ -59,149 +174,224 @@ export const sendSolanaPayment = async (wallet, amount = 0.01, connection) => {
     // Wait for confirmation
     await connection.confirmTransaction(signature);
     
-    console.log('✅ Solana Payment Successful!');
+    console.log('✅ Solana XRPB Payment Successful!');
     console.log('Transaction Signature:', signature);
-    console.log('View on Solscan:', `https://solscan.io/tx/${signature}?cluster=devnet`);
+    console.log('View on Solscan:', `https://solscan.io/tx/${signature}`);
     
-    // Store locally for verification
     const paymentData = {
       blockchain: 'Solana',
+      token: 'XRPB-SOL',
       from: wallet.publicKey.toString(),
-      to: solanaAddress,
+      to: PAYMENT_RECIPIENTS.solana,
       amount: amount,
       signature: signature,
       timestamp: new Date().toISOString(),
-      explorerUrl: `https://solscan.io/tx/${signature}?cluster=devnet`
+      explorerUrl: `https://solscan.io/tx/${signature}`,
+      network: 'mainnet'
     };
     
-    localStorage.setItem(`solana_payment_${signature}`, JSON.stringify(paymentData));
+    localStorage.setItem(`solana_xrpb_payment_${signature}`, JSON.stringify(paymentData));
     console.log('💾 Payment data saved locally:', paymentData);
     
     return { success: true, signature, paymentData };
     
   } catch (error) {
-    console.error('❌ Solana Payment Failed:', error);
+    console.error('❌ Solana XRPB Payment Failed:', error);
     return { success: false, error: error.message };
   }
 };
 
 /**
- * XRP Payment Helper Function with Real XUMM Payment Request (TESTNET)
- * @param {Object} wallet - Connected XRP wallet (XUMM)
- * @param {number} amount - Amount in XRP to send
- * @param {string} network - Network type ('XRPL' or 'XAHAU')
+ * XRPL XRPB Payment Function
+ * @param {Object} wallet - Connected XRPL wallet
+ * @param {number} amount - Amount in XRPB tokens
  */
-export const sendXRPPayment = async (wallet, amount = 1, network = 'XRPL') => {
+export const sendXRPLXRPBPayment = async (wallet, amount) => {
   try {
     if (!wallet || !wallet.account) {
-      throw new Error('XRP Wallet not connected');
+      throw new Error('XRPL Wallet not connected');
     }
 
-    console.log('🔵 XRP PAYMENT INITIATED (TESTNET)');
+    console.log('🔵 XRPL XRPB PAYMENT INITIATED (MAINNET)');
     console.log('From:', wallet.account);
-    console.log('To:', xrpAddress);
-    console.log('Amount:', amount, 'XRP');
-    console.log('Network:', network, '(TESTNET)');
+    console.log('To:', PAYMENT_RECIPIENTS.xrpl);
+    console.log('Amount:', amount, 'XRPB');
     
-    // Create XUMM payment request URL for TESTNET
-    const paymentUrl = `https://xaman.app/detect/request:${xrpAddress}?amount=${amount}&network=${network}`;
+    // Create XUMM payment request for XRPB token
+    const paymentUrl = `https://xaman.app/detect/request:${PAYMENT_RECIPIENTS.xrpl}?amount=${amount}&currency=${XRPB_TOKENS.xrpl.currency}&issuer=${XRPB_TOKENS.xrpl.issuer}&network=mainnet`;
     
-    console.log('🔗 XUMM Payment URL (TESTNET):', paymentUrl);
+    console.log('🔗 XUMM XRPB Payment URL:', paymentUrl);
     
     // Open XUMM payment request
     if (typeof window !== 'undefined') {
       window.open(paymentUrl, '_blank');
     }
     
-    // Start monitoring for actual transactions on TESTNET
-    console.log('⏳ Monitoring for payment completion on TESTNET...');
-    console.log('Please complete the payment in XUMM app');
+    console.log('⏳ Monitoring for XRPB payment completion...');
+    console.log('Please complete the XRPB payment in XUMM app');
     
-    // Monitor for actual transactions to the destination address
-    const monitoringResult = await monitorXRPTransactions(xrpAddress, amount, network, 300); // 5 minutes timeout
+    // Monitor for XRPB token transactions
+    const monitoringResult = await monitorXRPLXRPBTransactions(
+      PAYMENT_RECIPIENTS.xrpl, 
+      amount, 
+      XRPB_TOKENS.xrpl.currency,
+      XRPB_TOKENS.xrpl.issuer,
+      300
+    );
     
     if (monitoringResult.success) {
-      console.log('✅ XRP Payment Successful (TESTNET)!');
+      console.log('✅ XRPL XRPB Payment Successful!');
       console.log('Transaction Hash:', monitoringResult.txHash);
       
-      // Use TESTNET explorer URLs
-      const explorerUrl = network === 'XRPL' 
-        ? `https://testnet.xrpl.org/transactions/${monitoringResult.txHash}`
-        : `https://explorer.xahau-test.net/tx/${monitoringResult.txHash}`;
+      const explorerUrl = `https://livenet.xrpl.org/transactions/${monitoringResult.txHash}`;
+      console.log('View on XRPL Explorer:', explorerUrl);
       
-      console.log('View on TESTNET Explorer:', explorerUrl);
-      
-      // Store locally for verification
       const paymentData = {
-        blockchain: 'XRP',
-        network: `${network}_TESTNET`,
+        blockchain: 'XRPL',
+        token: 'XRPB',
         from: wallet.account,
-        to: xrpAddress,
+        to: PAYMENT_RECIPIENTS.xrpl,
         amount: amount,
         txHash: monitoringResult.txHash,
         timestamp: new Date().toISOString(),
         explorerUrl: explorerUrl,
         paymentUrl: paymentUrl,
         verified: true,
-        actualAmount: monitoringResult.actualAmount,
-        ledgerIndex: monitoringResult.ledgerIndex,
-        testnet: true
+        network: 'mainnet'
       };
       
-      localStorage.setItem(`xrp_payment_${monitoringResult.txHash}`, JSON.stringify(paymentData));
-      console.log('💾 Payment data saved locally (TESTNET):', paymentData);
+      localStorage.setItem(`xrpl_xrpb_payment_${monitoringResult.txHash}`, JSON.stringify(paymentData));
+      console.log('💾 Payment data saved locally:', paymentData);
       
       return { success: true, txHash: monitoringResult.txHash, paymentData, paymentUrl };
     } else {
-      throw new Error(monitoringResult.error || 'Payment monitoring failed or timed out');
+      throw new Error(monitoringResult.error || 'XRPB payment monitoring failed');
     }
     
   } catch (error) {
-    console.error('❌ XRP Payment Failed (TESTNET):', error);
+    console.error('❌ XRPL XRPB Payment Failed:', error);
     return { success: false, error: error.message };
   }
 };
 
 /**
- * Monitor XRP Transactions using JSON-RPC endpoint
+ * XRPL EVM XRPB Payment Function
+ * @param {Function} getSignerFn - Function to get the Wagmi signer
+ * @param {number} amount - Amount in XRPB tokens
+ */
+export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
+  try {
+    if (!getSignerFn) {
+      throw new Error('Signer function not provided');
+    }
+
+    // Get signer from Wagmi
+    const signer = await getSignerFn();
+    if (!signer) {
+      throw new Error('XRPL EVM Signer not available');
+    }
+
+    const fromAddress = await signer.getAddress();
+    
+    console.log('🟠 XRPL EVM XRPB PAYMENT INITIATED (TESTNET)');
+    console.log('From:', fromAddress);
+    console.log('To:', PAYMENT_RECIPIENTS.xrplEvm);
+    console.log('Amount:', amount, 'XRPB');
+    
+    // ERC-20 XRPB Token Contract ABI (minimal)
+    const xrpbAbi = [
+      'function transfer(address to, uint256 amount) returns (bool)',
+      'function balanceOf(address owner) view returns (uint256)',
+      'function decimals() view returns (uint8)'
+    ];
+    
+    // Create contract instance
+    const xrpbContract = new ethers.Contract(
+      XRPB_TOKENS.xrplEvm.address,
+      xrpbAbi,
+      signer
+    );
+    
+    // Convert amount to token units (considering decimals)
+    const tokenAmount = ethers.parseUnits(amount.toString(), XRPB_TOKENS.xrplEvm.decimals);
+    
+    console.log('📝 XRPB Transfer prepared:', {
+      contract: XRPB_TOKENS.xrplEvm.address,
+      to: PAYMENT_RECIPIENTS.xrplEvm,
+      amount: tokenAmount.toString()
+    });
+    
+    // Send XRPB transfer transaction
+    const txResponse = await xrpbContract.transfer(
+      PAYMENT_RECIPIENTS.xrplEvm,
+      tokenAmount
+    );
+    
+    console.log('⏳ XRPB transfer sent, waiting for confirmation...');
+    console.log('Transaction Hash:', txResponse.hash);
+    
+    // Wait for confirmation
+    const receipt = await txResponse.wait();
+    
+    console.log('✅ XRPL EVM XRPB Payment Successful!');
+    console.log('Transaction Hash:', txResponse.hash);
+    console.log('Block Number:', receipt.blockNumber);
+    console.log('Gas Used:', receipt.gasUsed.toString());
+    console.log('View on XRPL EVM Testnet Explorer:', `https://explorer.testnet.xrplevm.org/tx/${txResponse.hash}`);
+    
+    const paymentData = {
+      blockchain: 'XRPL_EVM',
+      token: 'XRPB',
+      from: fromAddress,
+      to: PAYMENT_RECIPIENTS.xrplEvm,
+      amount: amount,
+      txHash: txResponse.hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString(),
+      timestamp: new Date().toISOString(),
+      explorerUrl: `https://explorer.testnet.xrplevm.org/tx/${txResponse.hash}`,
+      network: 'testnet'
+    };
+    
+    localStorage.setItem(`xrpl_evm_xrpb_payment_${txResponse.hash}`, JSON.stringify(paymentData));
+    console.log('💾 Payment data saved locally:', paymentData);
+    
+    return { success: true, txHash: txResponse.hash, paymentData };
+    
+  } catch (error) {
+    console.error('❌ XRPL EVM XRPB Payment Failed:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Monitor XRPL XRPB Token Transactions
  * @param {string} destinationAddress - Address to monitor
  * @param {number} expectedAmount - Expected payment amount
- * @param {string} network - Network type ('XRPL' or 'XAHAU')
+ * @param {string} currency - Token currency code
+ * @param {string} issuer - Token issuer address
  * @param {number} timeoutSeconds - Monitoring timeout in seconds
  */
-export const monitorXRPTransactions = async (destinationAddress, expectedAmount, network = 'XRPL', timeoutSeconds = 300) => {
+export const monitorXRPLXRPBTransactions = async (destinationAddress, expectedAmount, currency, issuer, timeoutSeconds = 300) => {
   try {
-    console.log('🔍 Starting XRP transaction monitoring via JSON-RPC...');
+    console.log('🔍 Starting XRPL XRPB transaction monitoring...');
     console.log('Destination:', destinationAddress);
-    console.log('Expected Amount:', expectedAmount, 'XRP');
-    console.log('Network:', network);
-    console.log('Timeout:', timeoutSeconds, 'seconds');
+    console.log('Expected Amount:', expectedAmount, currency);
+    console.log('Issuer:', issuer);
     
     const startTime = Date.now();
     const timeoutMs = timeoutSeconds * 1000;
     const checkInterval = 10000; // 10 seconds
     
-    // JSON-RPC endpoints for testnet
-    const getRpcEndpoint = (network) => {
-      if (network === 'XRPL') {
-        return 'https://s.altnet.rippletest.net:51234/'; // XRPL Testnet
-      } else {
-        return 'https://xahau-test.net/'; // XAHAU Testnet
-      }
-    };
+    const rpcEndpoint = 'https://xrplcluster.com/';
+    console.log('📡 Using XRPL mainnet endpoint:', rpcEndpoint);
     
-    const rpcEndpoint = getRpcEndpoint(network);
-    console.log('📡 Using JSON-RPC endpoint:', rpcEndpoint);
-    
-    // Store initial timestamp to filter new transactions
     const monitorStartTime = new Date();
     
-    // Polling loop
     while (Date.now() - startTime < timeoutMs) {
       try {
-        console.log('🔄 Checking for new transactions via JSON-RPC...');
+        console.log('🔄 Checking for new XRPB transactions...');
         
-        // Query account transactions using JSON-RPC
         const rpcRequest = {
           method: 'account_tx',
           params: [{
@@ -209,7 +399,7 @@ export const monitorXRPTransactions = async (destinationAddress, expectedAmount,
             ledger_index_min: -1,
             ledger_index_max: -1,
             limit: 20,
-            forward: false // Get most recent first
+            forward: false
           }]
         };
         
@@ -222,7 +412,7 @@ export const monitorXRPTransactions = async (destinationAddress, expectedAmount,
         });
         
         if (!response.ok) {
-          console.log(`⚠️ JSON-RPC request failed: ${response.status} ${response.statusText}`);
+          console.log(`⚠️ XRPL request failed: ${response.status}`);
           await new Promise(resolve => setTimeout(resolve, checkInterval));
           continue;
         }
@@ -230,142 +420,95 @@ export const monitorXRPTransactions = async (destinationAddress, expectedAmount,
         const data = await response.json();
         
         if (data.error) {
-          console.log('⚠️ JSON-RPC error:', data.error);
+          console.log('⚠️ XRPL error:', data.error);
           await new Promise(resolve => setTimeout(resolve, checkInterval));
           continue;
         }
         
-        console.log('📊 JSON-RPC Response received, checking transactions...');
-        
         const transactions = data.result?.transactions || [];
         console.log(`📋 Found ${transactions.length} recent transactions`);
         
-        // Check each transaction
         for (const txData of transactions) {
           const tx = txData.tx;
           const meta = txData.meta;
           
-          if (!tx) continue;
+          if (!tx || tx.TransactionType !== 'Payment') continue;
+          if (tx.Destination !== destinationAddress) continue;
+          if (!meta || meta.TransactionResult !== 'tesSUCCESS') continue;
           
-          // Check if this is a payment to our destination
-          const isPaymentToDestination = 
-            tx.TransactionType === 'Payment' &&
-            tx.Destination === destinationAddress;
+          // Check if this is an XRPB token payment
+          let deliveredAmount = 0;
+          let isXRPBPayment = false;
           
-          if (!isPaymentToDestination) continue;
+          if (meta.delivered_amount && typeof meta.delivered_amount === 'object') {
+            const delivered = meta.delivered_amount;
+            if (delivered.currency === currency && delivered.issuer === issuer) {
+              deliveredAmount = parseFloat(delivered.value);
+              isXRPBPayment = true;
+            }
+          } else if (tx.Amount && typeof tx.Amount === 'object') {
+            const amount = tx.Amount;
+            if (amount.currency === currency && amount.issuer === issuer) {
+              deliveredAmount = parseFloat(amount.value);
+              isXRPBPayment = true;
+            }
+          }
           
-          // Check transaction success
-          const isSuccessful = meta && meta.TransactionResult === 'tesSUCCESS';
-          if (!isSuccessful) continue;
+          if (!isXRPBPayment) continue;
           
           // Parse transaction timestamp
-          let txTime;
-          try {
-            if (tx.date && typeof tx.date === 'number') {
-              // Ripple timestamp (seconds since 2000-01-01)
-              txTime = new Date((tx.date + 946684800) * 1000);
-            } else if (txData.ledger_index && typeof txData.ledger_index === 'number') {
-              // Estimate time based on ledger index (approximately 3.5 seconds per ledger)
-              const estimatedTime = new Date(Date.now() - (txData.ledger_index * 3500));
-              txTime = estimatedTime;
-            } else {
-              // Fallback to current time
-              txTime = new Date();
-            }
-            
-            // Validate the parsed date
-            if (!txTime || isNaN(txTime.getTime())) {
-              console.log('⚠️ Invalid timestamp found, using current time as fallback');
-              txTime = new Date();
-            }
-          } catch (timestampError) {
-            console.log('⚠️ Error parsing timestamp:', timestampError.message, 'Using current time as fallback');
-            txTime = new Date();
+          let txTime = new Date();
+          if (tx.date && typeof tx.date === 'number') {
+            txTime = new Date((tx.date + 946684800) * 1000);
           }
           
-          // Only consider transactions after monitoring started (with 1 minute buffer)
-          const bufferTime = new Date(monitorStartTime.getTime() - 60000); // 1 minute before
-          if (txTime < bufferTime) {
-            console.log('⏭️ Skipping old transaction:', tx.hash);
-            continue;
-          }
+          // Only consider recent transactions
+          const bufferTime = new Date(monitorStartTime.getTime() - 60000);
+          if (txTime < bufferTime) continue;
           
-          // Parse delivered amount
-          let deliveredAmount = 0;
-          
-          // Check delivered_amount in meta first (most accurate)
-          if (meta.delivered_amount) {
-            if (typeof meta.delivered_amount === 'string') {
-              // Native XRP in drops
-              deliveredAmount = parseInt(meta.delivered_amount) / 1000000;
-            } else if (typeof meta.delivered_amount === 'object' && meta.delivered_amount.value) {
-              // Non-XRP currency
-              deliveredAmount = parseFloat(meta.delivered_amount.value);
-            }
-          } else if (tx.Amount) {
-            // Fallback to transaction Amount
-            if (typeof tx.Amount === 'string') {
-              // Native XRP in drops
-              deliveredAmount = parseInt(tx.Amount) / 1000000;
-            } else if (typeof tx.Amount === 'object' && tx.Amount.value) {
-              // Non-XRP currency
-              deliveredAmount = parseFloat(tx.Amount.value);
-            }
-          }
-          
-          console.log('📥 Found potential transaction:', {
+          console.log('📥 Found XRPB transaction:', {
             hash: tx.hash,
             amount: deliveredAmount,
             expected: expectedAmount,
-            time: txTime.toISOString(),
-            destination: tx.Destination,
-            ledger: txData.ledger_index
+            currency: currency,
+            issuer: issuer
           });
           
-          // Check if amount matches (with tolerance for fees)
-          const tolerance = Math.max(0.001, expectedAmount * 0.02); // 2% tolerance or 0.001 XRP minimum
+          // Check if amount matches
+          const tolerance = Math.max(0.001, expectedAmount * 0.02);
           const amountDifference = Math.abs(deliveredAmount - expectedAmount);
           
           if (amountDifference <= tolerance) {
-            console.log('✅ Payment verified via JSON-RPC!');
-            console.log(`💰 Amount match: ${deliveredAmount} XRP (expected: ${expectedAmount} XRP, tolerance: ${tolerance})`);
-            
+            console.log('✅ XRPB payment verified!');
             return {
               success: true,
               txHash: tx.hash,
               actualAmount: deliveredAmount,
               expectedAmount: expectedAmount,
-              tolerance: tolerance,
+              currency: currency,
+              issuer: issuer,
               timestamp: txTime.toISOString(),
               transaction: tx,
-              metadata: meta,
-              ledgerIndex: txData.ledger_index,
-              testnet: true,
-              verificationMethod: 'json_rpc'
+              metadata: meta
             };
-          } else {
-            console.log(`💸 Amount mismatch: ${deliveredAmount} XRP vs expected ${expectedAmount} XRP (difference: ${amountDifference}, tolerance: ${tolerance})`);
           }
         }
         
       } catch (error) {
-        console.log('❌ Error checking transactions via JSON-RPC:', error.message);
+        console.log('❌ Error checking XRPB transactions:', error.message);
       }
       
-      // Wait before next check
       console.log(`⏳ Waiting ${checkInterval/1000} seconds before next check...`);
       await new Promise(resolve => setTimeout(resolve, checkInterval));
     }
     
-    // Timeout reached
-    console.log('⏰ Monitoring timeout reached');
     return {
       success: false,
-      error: 'Payment monitoring timeout - no matching transaction found via JSON-RPC'
+      error: 'XRPB payment monitoring timeout'
     };
     
   } catch (error) {
-    console.error('❌ XRP Transaction Monitoring via JSON-RPC Failed:', error);
+    console.error('❌ XRPL XRPB Transaction Monitoring Failed:', error);
     return {
       success: false,
       error: error.message
@@ -373,267 +516,7 @@ export const monitorXRPTransactions = async (destinationAddress, expectedAmount,
   }
 };
 
-/**
- * Verify Specific XRP Transaction using JSON-RPC
- * @param {string} txHash - Transaction hash to verify
- * @param {number} expectedAmount - Expected payment amount
- * @param {string} expectedDestination - Expected destination address
- * @param {string} network - Network type ('XRPL' or 'XAHAU')
- */
-export const verifyXRPTransaction = async (txHash, expectedAmount, expectedDestination, network = 'XRPL') => {
-  try {
-    console.log('🔍 Verifying XRP Transaction via JSON-RPC...');
-    console.log('TX Hash:', txHash);
-    console.log('Expected Amount:', expectedAmount, 'XRP');
-    console.log('Expected Destination:', expectedDestination);
-    console.log('Network:', network);
-    
-    // JSON-RPC endpoints for testnet
-    const getRpcEndpoint = (network) => {
-      if (network === 'XRPL') {
-        return 'https://s.altnet.rippletest.net:51234/'; // XRPL Testnet
-      } else {
-        return 'https://xahau-test.net/'; // XAHAU Testnet
-      }
-    };
-    
-    const rpcEndpoint = getRpcEndpoint(network);
-    console.log('📡 Using JSON-RPC endpoint:', rpcEndpoint);
-    
-    // Query specific transaction using JSON-RPC
-    const rpcRequest = {
-      method: 'tx',
-      params: [{
-        transaction: txHash,
-        binary: false
-      }]
-    };
-    
-    const response = await fetch(rpcEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(rpcRequest)
-    });
-    
-    if (!response.ok) {
-      return {
-        success: false,
-        verified: false,
-        error: `Transaction not found via JSON-RPC: ${response.status} ${response.statusText}`
-      };
-    }
-    
-    const data = await response.json();
-    
-    if (data.error) {
-      return {
-        success: false,
-        verified: false,
-        error: `Transaction not found via JSON-RPC: ${data.error.error_message || data.error}`
-      };
-    }
-    
-    const transaction = data.result;
-    const meta = transaction.meta;
-    
-    if (!transaction) {
-      return {
-        success: false,
-        verified: false,
-        error: 'Transaction not found via JSON-RPC'
-      };
-    }
-    
-    // Verification checks
-    const checks = {
-      transactionExists: true,
-      transactionValidated: transaction.validated === true,
-      correctDestination: transaction.Destination === expectedDestination,
-      transactionSuccessful: meta && meta.TransactionResult === 'tesSUCCESS'
-    };
-    
-    // Check amount
-    let deliveredAmount = 0;
-    
-    // Check delivered_amount in meta first (most accurate)
-    if (meta && meta.delivered_amount) {
-      if (typeof meta.delivered_amount === 'string') {
-        deliveredAmount = parseInt(meta.delivered_amount) / 1000000; // Convert drops to XRP
-      } else if (typeof meta.delivered_amount === 'object' && meta.delivered_amount.value) {
-        deliveredAmount = parseFloat(meta.delivered_amount.value);
-      }
-    } else if (transaction.Amount) {
-      if (typeof transaction.Amount === 'string') {
-        deliveredAmount = parseInt(transaction.Amount) / 1000000;
-      } else if (typeof transaction.Amount === 'object' && transaction.Amount.value) {
-        deliveredAmount = parseFloat(transaction.Amount.value);
-      }
-    }
-    
-    const tolerance = Math.max(0.001, expectedAmount * 0.02); // 2% tolerance or 0.001 XRP minimum
-    checks.correctAmount = Math.abs(deliveredAmount - expectedAmount) <= tolerance;
-    
-    console.log('🔍 Verification Checks via JSON-RPC:', checks);
-    console.log('💰 Amount Details:', {
-      delivered: deliveredAmount,
-      expected: expectedAmount,
-      tolerance: tolerance,
-      difference: Math.abs(deliveredAmount - expectedAmount)
-    });
-    
-    const allChecksPassed = Object.values(checks).every(check => check === true);
-    
-    if (allChecksPassed) {
-      console.log('✅ Transaction verification successful via JSON-RPC!');
-      return {
-        success: true,
-        verified: true,
-        transaction: transaction,
-        checks: checks,
-        deliveredAmount: deliveredAmount,
-        expectedAmount: expectedAmount,
-        tolerance: tolerance,
-        testnet: network !== 'XRPL',
-        verificationMethod: 'json_rpc'
-      };
-    } else {
-      console.log('❌ Transaction verification failed via JSON-RPC!');
-      return {
-        success: false,
-        verified: false,
-        error: 'Verification checks failed via JSON-RPC',
-        checks: checks,
-        deliveredAmount: deliveredAmount,
-        expectedAmount: expectedAmount
-      };
-    }
-    
-  } catch (error) {
-    console.error('❌ XRP Transaction Verification via JSON-RPC Failed:', error);
-    return {
-      success: false,
-      verified: false,
-      error: error.message
-    };
-  }
-};
-
-
-
-
-/**
- * EVM Payment Helper Function (Ethereum/Polygon/BSC etc.)
- * @param {Object} signer - Ethers.js signer object
- * @param {number} amount - Amount in ETH to send
- */
-export const sendEVMPayment = async (signer, amount = 0.001) => {
-  try {
-    if (!signer) {
-      throw new Error('EVM Signer not available');
-    }
-
-    const fromAddress = await signer.getAddress();
-    
-    console.log('🟠 EVM PAYMENT INITIATED');
-    console.log('From:', fromAddress);
-    console.log('To:', evmAddress);
-    console.log('Amount:', amount, 'ETH');
-    
-    // Prepare transaction
-    const tx = {
-      to: evmAddress,
-      value: ethers.parseEther(amount.toString()),
-      gasLimit: 21000,
-    };
-    
-    // Get gas price using ethers.js v6 syntax
-    const feeData = await signer.provider.getFeeData();
-    if (feeData.gasPrice) {
-      tx.gasPrice = feeData.gasPrice;
-    }
-    
-    console.log('📝 Transaction prepared:', {
-      ...tx,
-      value: tx.value.toString(),
-      gasPrice: tx.gasPrice ? tx.gasPrice.toString() : 'auto'
-    });
-    
-    // Send transaction
-    const txResponse = await signer.sendTransaction(tx);
-    
-    console.log('⏳ Transaction sent, waiting for confirmation...');
-    console.log('Transaction Hash:', txResponse.hash);
-    
-    // Wait for confirmation
-    const receipt = await txResponse.wait();
-    
-    console.log('✅ EVM Payment Successful!');
-    console.log('Transaction Hash:', txResponse.hash);
-    console.log('Block Number:', receipt.blockNumber);
-    console.log('Gas Used:', receipt.gasUsed.toString());
-    console.log('View on Etherscan:', `https://sepolia.etherscan.io/tx/${txResponse.hash}`);
-    
-    // Store locally for verification
-    const paymentData = {
-      blockchain: 'EVM',
-      from: fromAddress,
-      to: evmAddress,
-      amount: amount,
-      txHash: txResponse.hash,
-      blockNumber: receipt.blockNumber,
-      gasUsed: receipt.gasUsed.toString(),
-      timestamp: new Date().toISOString(),
-      explorerUrl: `https://sepolia.etherscan.io/tx/${txResponse.hash}`
-    };
-    
-    localStorage.setItem(`evm_payment_${txResponse.hash}`, JSON.stringify(paymentData));
-    console.log('💾 Payment data saved locally:', paymentData);
-    
-    return { success: true, txHash: txResponse.hash, receipt, paymentData };
-    
-  } catch (error) {
-    console.error('❌ EVM Payment Failed:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Utility function to retrieve all stored payment data
- */
-export const getStoredPayments = () => {
-  const payments = [];
-  
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (key.startsWith('solana_payment_') || key.startsWith('xrp_payment_') || key.startsWith('evm_payment_'))) {
-      try {
-        const paymentData = JSON.parse(localStorage.getItem(key));
-        payments.push(paymentData);
-      } catch (error) {
-        console.error('Error parsing stored payment:', error);
-      }
-    }
-  }
-  
-  console.log('📊 All stored payments:', payments);
-  return payments;
-};
-
-/**
- * Clear all stored payment data
- */
-export const clearStoredPayments = () => {
-  const keysToRemove = [];
-  
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (key.startsWith('solana_payment_') || key.startsWith('xrp_payment_') || key.startsWith('evm_payment_'))) {
-      keysToRemove.push(key);
-    }
-  }
-  
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-  console.log('🗑️ Cleared', keysToRemove.length, 'stored payments');
-};
+// Legacy function names for backward compatibility
+export const sendSolanaPayment = sendSolanaXRPBPayment;
+export const sendXRPPayment = sendXRPLXRPBPayment;
+export const sendEVMPayment = sendXRPLEvmXRPBPayment;

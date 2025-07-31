@@ -26,7 +26,7 @@ export default function MyOrdersPage() {
     if (xrpWalletAddress) {
       wallets.push({
         type: 'xrp',
-        name: 'XUMM (XRP)',
+        name: 'XAMAN (XRP)',
         address: xrpWalletAddress,
         icon: '🔷',
         currency: 'XRP'

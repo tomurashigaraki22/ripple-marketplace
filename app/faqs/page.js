@@ -24,7 +24,7 @@ export default function FAQsPage() {
         {
           question: "What wallets are supported?",
           answer:
-            "We support XUMM for XRP Ledger, MetaMask for XRPL-EVM chains, and Phantom for Solana. Each wallet connects to its respective blockchain network.",
+            "We support XAMAN for XRP Ledger, MetaMask for XRPL-EVM chains, and Phantom for Solana. Each wallet connects to its respective blockchain network.",
         },
       ],
     },

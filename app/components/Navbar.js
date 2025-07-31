@@ -151,8 +151,8 @@ export default function Navbar() {
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-1">
               {[
-                { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
-                { href: '/marketplace/orders', label: 'My Orders', icon: Package },
+                ...(!user ? [{ href: '/marketplace', label: 'Marketplace', icon: ShoppingBag }] : []),
+                ...(user ? [{ href: '/marketplace/orders', label: 'My Orders', icon: Package }] : []),
                 { href: '/membership', label: 'Membership', icon: Shield },
                 { href: '/portal', label: 'My Portal', icon: User },
                 { href: '/faqs', label: 'FAQs', icon: Globe }

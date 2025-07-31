@@ -145,7 +145,7 @@ function LoginForm() {
               </div>
             </div>
 
-            <div className="mt-6 space-y-3">
+            {/* <div className="mt-6 space-y-3">
               <button
                 onClick={() => handleWalletLogin("XUMM")}
                 className="w-full py-3 border border-gray-600 rounded-lg hover:border-[#39FF14] transition-colors"
@@ -164,7 +164,7 @@ function LoginForm() {
               >
                 Connect with Phantom (Solana)
               </button>
-            </div>
+            </div> */}
           </div>
 
           <div className="mt-8 text-center">

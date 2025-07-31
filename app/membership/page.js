@@ -6,13 +6,13 @@ import { Check, Star, Crown, Zap, Sparkles, ArrowRight, Wallet, X, AlertCircle, 
 import { useXRPL } from '../context/XRPLContext'
 import { useMetamask } from '../context/MetamaskContext'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
-import { sendSolanaPayment, sendXRPPayment, sendEVMPayment } from '../constructs/payments/signAndPay'
+import { sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getXRPBPriceInUSD, calculateXRPBAmount } from '../constructs/payments/signAndPay'
 import { ethers } from 'ethers'
 
 export default function MembershipPage() {
   // Wallet contexts
-  const { xrpWalletAddress, xrplWallet } = useXRPL()
-  const { metamaskWalletAddress, isConnected: metamaskConnected } = useMetamask()
+  const { xrpWalletAddress, xrplWallet, xrpbBalance } = useXRPL()
+  const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner } = useMetamask()
   const { publicKey, connected: solanaConnected } = useWallet()
   const { connection } = useConnection()
 
@@ -24,155 +24,75 @@ export default function MembershipPage() {
   const [paymentResult, setPaymentResult] = useState(null)
   const [connectedWallets, setConnectedWallets] = useState([])
   
-  // Add these new state variables for subscription status
+  // Subscription status states
   const [currentMembership, setCurrentMembership] = useState(null)
   const [isSubscriptionActive, setIsSubscriptionActive] = useState(false)
   const [membershipLoading, setMembershipLoading] = useState(true)
+  
+  // XRPB price and conversion states
+  const [xrpbPrice, setXrpbPrice] = useState(3.10) // Default $0.10 per XRPB
+  const [isLoadingPrice, setIsLoadingPrice] = useState(false)
 
-  // Update connected wallets
+  // Update connected wallets with XRPB token info
   useEffect(() => {
     const wallets = []
     if (xrpWalletAddress) {
       wallets.push({
-        type: 'xrp',
-        name: 'XUMM (XRP)',
+        type: 'xrpl',
+        name: 'XAMAN (XRPL)',
         address: xrpWalletAddress,
         icon: '🔷',
-        currency: 'XRP'
+        currency: 'XRPB',
+        balance: xrpbBalance,
+        network: 'XRPL Mainnet'
       })
     }
     if (metamaskConnected && metamaskWalletAddress) {
       wallets.push({
-        type: 'evm',
-        name: 'MetaMask (ETH)',
+        type: 'xrpl_evm',
+        name: 'MetaMask (XRPL EVM)',
         address: metamaskWalletAddress,
         icon: '🦊',
-        currency: 'ETH'
+        currency: 'XRPB',
+        network: isXRPLEVM ? 'XRPL EVM Mainnet' : 'Wrong Network',
+        needsSwitch: !isXRPLEVM
       })
     }
     if (solanaConnected && publicKey) {
       wallets.push({
         type: 'solana',
-        name: 'Solflare (SOL)',
+        name: 'Phantom (Solana)',
         address: publicKey.toString(),
         icon: '☀️',
-        currency: 'SOL'
+        currency: 'XRPB-SOL',
+        network: 'Solana Mainnet'
       })
     }
     setConnectedWallets(wallets)
-  }, [xrpWalletAddress, metamaskConnected, metamaskWalletAddress, solanaConnected, publicKey])
+  }, [xrpWalletAddress, xrpbBalance, metamaskConnected, metamaskWalletAddress, isXRPLEVM, solanaConnected, publicKey])
 
-  const tiers = [
-    {
-      name: "Free",
-      price: "Free",
-      priceUSD: 0,
-      icon: <Star className="w-8 h-8" />,
-      features: [
-        "Basic marketplace access",
-        "Standard transaction fees (2.5%)",
-        "Community support",
-        "Basic profile features",
-        "Limited daily transactions (10)",
-      ],
-      buttonText: "Current Plan",
-      buttonClass: "bg-black/40 backdrop-blur-xl border border-gray-600 text-gray-400 cursor-not-allowed",
-      popular: false,
-      disabled: true
-    },
-    {
-      name: "Pro",
-      price: "100 XRPB/month",
-      priceUSD: 50,
-      icon: <Zap className="w-8 h-8" />,
-      features: [
-        "All Free features",
-        "Reduced fees (1.5%)",
-        "Priority customer support",
-        "Advanced analytics",
-        "Unlimited transactions",
-        "Early access to new features",
-        "Custom profile themes",
-      ],
-      buttonText: "Upgrade to Pro",
-      buttonClass: "bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black hover:shadow-[0_0_40px_rgba(57,255,20,0.6)] transform hover:scale-105",
-      popular: true,
-      disabled: false
-    },
-    {
-      name: "Premium",
-      price: "500 XRPB/month",
-      priceUSD: 250,
-      icon: <Crown className="w-8 h-8" />,
-      features: [
-        "All Pro features",
-        "Lowest fees (0.5%)",
-        "Dedicated account manager",
-        "Exclusive drops access",
-        "Higher staking returns (15% APY)",
-        "White-label solutions",
-        "API access",
-        "Custom integrations",
-      ],
-      buttonText: "Upgrade to Premium",
-      buttonClass: "bg-black/40 backdrop-blur-xl border-2 border-[#39FF14]/50 text-[#39FF14] hover:border-[#39FF14] hover:shadow-[0_0_30px_rgba(57,255,20,0.3)] transform hover:scale-105",
-      popular: false,
-      disabled: false
-    },
-  ]
+  // Function to calculate XRPB amount from USD
+  // const calculateXRPBAmount = (usdAmount) => {
+  //   return Math.ceil(usdAmount / xrpbPrice) // Round up to ensure sufficient payment
+  // }
 
-  const benefits = [
-    {
-      title: "Lower Transaction Fees",
-      description: "Save money on every transaction with reduced fees for Pro and Premium members",
-      icon: <Zap className="w-8 h-8" />,
-    },
-    {
-      title: "Exclusive NFT Drops",
-      description: "Get early access to limited edition NFTs and exclusive marketplace items",
-      icon: <Sparkles className="w-8 h-8" />,
-    },
-    {
-      title: "Higher Staking Returns",
-      description: "Earn more XRPB tokens through enhanced staking rewards for premium members",
-      icon: <Star className="w-8 h-8" />,
-    },
-    {
-      title: "Priority Support",
-      description: "24/7 priority customer support with dedicated account management",
-      icon: <Crown className="w-8 h-8" />,
-    },
-  ]
-
-  // Calculate payment amounts based on wallet type
+  // Add this new function after calculateXRPBAmount
   const getPaymentAmount = (tier, walletType) => {
-    const basePrice = tier.priceUSD
-    switch (walletType) {
-      case 'xrp':
-        return (basePrice / 2).toFixed(2) // Assuming 1 XRP = $0.50
-      case 'solana':
-        return (basePrice / 20).toFixed(3) // Assuming 1 SOL = $20
-      case 'evm':
-        return (basePrice / 2000).toFixed(4) // Assuming 1 ETH = $2000
-      default:
-        return basePrice
-    }
+    if (!tier || tier.priceUSD === 0) return 0
+    return calculateXRPBAmount(tier.priceUSD, xrpbPrice)
   }
 
-  const handleUpgrade = (tier) => {
-    if (tier.disabled) return
-    
-    if (connectedWallets.length === 0) {
-      alert('Please connect a wallet first!')
-      return
-    }
-    
-    setSelectedTier(tier)
-    setShowPaymentModal(true)
-    setPaymentResult(null)
-  }
 
-  // Add these useEffect hooks and functions
+
+  // Fetch XRPB price on component mount
+  useEffect(() => {
+    fetchXRPBPrice()
+  }, [])
+
+
+
+
+  // Fetch membership data
   useEffect(() => {
     fetchCurrentMembership()
     fetchMembershipTiers()
@@ -196,10 +116,9 @@ export default function MembershipPage() {
       if (response.ok) {
         const data = await response.json()
         setCurrentMembership(data.currentMembership)
-        // Check if subscription is active (Pro or Premium)
         const isActive = data.currentMembership && 
                       data.currentMembership.membership &&
-                      Boolean(data.currentMembership.membership.isActive) && // Convert 1 to true
+                      Boolean(data.currentMembership.membership.isActive) &&
                       (data.currentMembership.tier.name.toLowerCase() === 'pro' || 
                        data.currentMembership.tier.name.toLowerCase() === 'premium')
         setIsSubscriptionActive(isActive)
@@ -211,6 +130,144 @@ export default function MembershipPage() {
       setMembershipLoading(false)
     }
   }
+  
+
+
+  const handleUpgrade = (tier) => {
+    if (tier.disabled) return
+    
+    if (connectedWallets.length === 0) {
+      alert('Please connect a wallet first!')
+      return
+    }
+    
+    setSelectedTier(tier)
+    setShowPaymentModal(true)
+    setPaymentResult(null)
+  }
+
+  // Function to calculate XRPB amount from USD using dynamic pricing
+  const calculateXRPBAmountDynamic = async (usdAmount) => {
+    try {
+      const currentPrice = await getXRPBPriceInUSD();
+      if (currentPrice) {
+        setXrpbPrice(currentPrice);
+        return calculateXRPBAmount(usdAmount, currentPrice);
+      } else {
+        // Fallback to static price if API fails
+        console.warn('Using fallback XRPB price');
+        return calculateXRPBAmount(usdAmount, xrpbPrice);
+      }
+    } catch (error) {
+      console.error('Error calculating XRPB amount:', error);
+      // Fallback to static calculation
+      return Math.ceil(usdAmount / xrpbPrice);
+    }
+  };
+
+  // Function to fetch XRPB price with dynamic pricing
+  const fetchXRPBPrice = async () => {
+    setIsLoadingPrice(true);
+    try {
+      const dynamicPrice = await getXRPBPriceInUSD();
+      if (dynamicPrice) {
+        setXrpbPrice(dynamicPrice);
+        console.log('✅ Dynamic XRPB price fetched:', dynamicPrice);
+      } else {
+        // Fallback price
+        setXrpbPrice(3.10);
+        console.warn('⚠️ Using fallback XRPB price: $3.10');
+      }
+    } catch (error) {
+      console.error('Error fetching XRPB price:', error);
+      setXrpbPrice(3.10); // Fallback price
+    } finally {
+      setIsLoadingPrice(false);
+    }
+  };
+
+  // Update tiers to use dynamic calculation
+  const tiers = [
+    {
+      name: "Free",
+      price: "Free",
+      priceUSD: 0,
+      priceXRPB: 0,
+      icon: <Star className="w-8 h-8" />,
+      features: [
+        "Basic marketplace access",
+        "Standard transaction fees (3.5%)",
+        "Community support",
+        "Basic profile features",
+        "Limited daily transactions (10)",
+      ],
+      buttonText: "Current Plan",
+      buttonClass: "bg-black/40 backdrop-blur-xl border border-gray-600 text-gray-400 cursor-not-allowed",
+      popular: false,
+      disabled: true
+    },
+    {
+      name: "Pro",
+      price: "$25/month",
+      priceUSD: 25,
+      priceXRPB: Math.ceil(25 / xrpbPrice), // Dynamic calculation
+      icon: <Zap className="w-8 h-8" />,
+      features: [
+        "All Free features",
+        "Reduced fees (2.5%)",
+        "Priority customer support",
+        "Advanced analytics",
+        "Unlimited transactions",
+        "Early access to new features",
+        "Custom profile themes",
+      ],
+      buttonText: "Upgrade to Pro",
+      buttonClass: "bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black hover:shadow-[0_0_40px_rgba(57,255,20,0.6)] transform hover:scale-105",
+      popular: true,
+      disabled: false
+    },
+    {
+      name: "Premium",
+      price: "$50/month",
+      priceUSD: 50,
+      priceXRPB: Math.ceil(50 / xrpbPrice), // Dynamic calculation
+      icon: <Crown className="w-8 h-8" />,
+      features: [
+        "All Pro features",
+        "Lowest fees (1.5%)",
+        "Dedicated account manager",
+        "Exclusive drops access",
+        "White-label solutions",
+        "API access",
+        "Custom integrations",
+      ],
+      buttonText: "Upgrade to Premium",
+      buttonClass: "bg-black/40 backdrop-blur-xl border-2 border-[#39FF14]/50 text-[#39FF14] hover:border-[#39FF14] hover:shadow-[0_0_30px_rgba(57,255,20,0.3)] transform hover:scale-105",
+      popular: false,
+      disabled: false
+    },
+  ]
+
+  const benefits = [
+    {
+      title: "Lower Transaction Fees",
+      description: "Save money on every transaction with reduced fees for Pro and Premium members",
+      icon: <Zap className="w-8 h-8" />,
+    },
+    {
+      title: "Exclusive NFT Drops",
+      description: "Get early access to limited edition NFTs and exclusive marketplace items",
+      icon: <Sparkles className="w-8 h-8" />,
+    },
+    {
+      title: "Priority Support",
+      description: "24/7 priority customer support with dedicated account management",
+      icon: <Crown className="w-8 h-8" />,
+    },
+  ]
+
+  // Fetch membership data
+
   
   const fetchMembershipTiers = async () => {
     try {
@@ -225,7 +282,6 @@ export default function MembershipPage() {
   
       if (response.ok) {
         const data = await response.json()
-        // Update tiers with user status
         console.log('Membership tiers:', data.membershipTiers)
       }
     } catch (error) {
@@ -233,69 +289,88 @@ export default function MembershipPage() {
     }
   }
 
-  // Update the handlePayment function
-  const handlePayment = async () => {
-    if (!selectedTier || !paymentMethod) return
 
-    setIsProcessing(true)
-    setPaymentResult(null)
+
+  const handlePayment = async () => {
+    if (!selectedTier || !paymentMethod) return;
+
+    setIsProcessing(true);
+    setPaymentResult(null);
 
     try {
-      let result
-      const amount = getPaymentAmount(selectedTier, paymentMethod.type)
+      let result;
+      // Calculate XRPB amount using dynamic pricing
+      const xrpbAmount = await calculateXRPBAmountDynamic(selectedTier.priceUSD);
+
+      // Check if wallet needs network switch
+      if (paymentMethod.needsSwitch) {
+        await switchToXRPLEVM()
+        setPaymentResult({
+          success: false,
+          pending: true,
+          message: 'Please switch to XRPL EVM network and try again.'
+        })
+        setIsProcessing(false)
+        return
+      }
+
+      console.log('🚀 Starting payment with:', {
+        tier: selectedTier.name,
+        method: paymentMethod.type,
+        amount: xrpbAmount,
+        usdAmount: selectedTier.priceUSD
+      })
 
       switch (paymentMethod.type) {
         case 'solana':
-          result = await sendSolanaPayment(
+          result = await sendSolanaXRPBPayment(
             { publicKey, connected: solanaConnected, signTransaction: async (tx) => tx },
-            parseFloat(amount),
+            xrpbAmount,
             connection
-          )
-          break
+          );
+          break;
 
-        case 'xrp':
-          // Show loading message for XRP payments
+        case 'xrpl':
           setPaymentResult({
             success: false,
             pending: true,
-            message: 'Please complete the payment in XUMM app. This may take a few minutes...'
-          })
+            message: 'Please complete the XRPB payment in XAMAN app. This may take a few minutes...'
+          });
           
-          result = await sendXRPPayment(
+          result = await sendXRPLXRPBPayment(
             { account: xrpWalletAddress },
-            parseFloat(1),
-            'XRPL'
-          )
-          break
+            xrpbAmount
+          );
+          break;
 
-        case 'evm':
-          if (window.ethereum) {
-            const provider = new ethers.BrowserProvider(window.ethereum)
-            const signer = await provider.getSigner()
-            result = await sendEVMPayment(signer, parseFloat(amount))
-          } else {
-            throw new Error('MetaMask not available')
+        case 'xrpl_evm':
+          if (!getSigner) {
+            throw new Error('MetaMask signer not available');
           }
-          break
+          console.log('🦊 Using Wagmi signer for XRPL EVM payment...');
+          console.log('💰 XRPB Amount calculated:', xrpbAmount, 'for $', selectedTier.priceUSD);
+          result = await sendXRPLEvmXRPBPayment(getSigner, xrpbAmount);
+          break;
 
         default:
-          throw new Error('Unsupported payment method')
+          throw new Error('Unsupported payment method');
       }
 
+      console.log('💰 Payment result:', result)
       setPaymentResult(result)
       
       if (result.success) {
-        // Store membership upgrade locally
         const membershipData = {
           tier: selectedTier.name,
           paymentMethod: paymentMethod.name,
-          amount: amount,
+          amountUSD: selectedTier.priceUSD,
+          amountXRPB: xrpbAmount,
           currency: paymentMethod.currency,
           timestamp: new Date().toISOString(),
           txHash: result.signature || result.txHash,
           paymentUrl: result.paymentUrl,
           verified: result.paymentData?.verified,
-          xummUuid: result.paymentData?.xummUuid
+          network: paymentMethod.network
         }
         localStorage.setItem('membership_upgrade', JSON.stringify(membershipData))
         
@@ -303,7 +378,13 @@ export default function MembershipPage() {
       }
 
     } catch (error) {
-      console.error('Payment failed:', error)
+      console.error('❌ Payment failed with error:', error)
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        paymentMethod: paymentMethod?.type,
+        tier: selectedTier?.name
+      })
       setPaymentResult({
         success: false,
         error: error.message
@@ -311,7 +392,7 @@ export default function MembershipPage() {
     } finally {
       setIsProcessing(false)
     }
-  }
+  };
 
   const closeModal = () => {
     setShowPaymentModal(false)
@@ -337,17 +418,34 @@ export default function MembershipPage() {
           <div className="text-center mb-16">
             <div className="mb-8">
               <h1 className="text-5xl md:text-6xl font-black mb-6 bg-gradient-to-r from-white via-[#39FF14] to-white bg-clip-text text-transparent leading-tight">
-                Membership Tiers
+                XRPB Membership Tiers
               </h1>
               <div className="flex justify-center mb-6">
                 <Sparkles className="w-8 h-8 text-[#39FF14] animate-pulse" />
               </div>
             </div>
             <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto font-light leading-relaxed">
-              Unlock exclusive benefits, lower fees, and <span className="text-[#39FF14] font-semibold">premium features</span> with XRPB membership tiers
+              Affordable USD pricing, paid with <span className="text-[#39FF14] font-semibold">XRPB tokens</span> across multiple chains
             </p>
             
-            {/* Active Subscription Status with Storefront Access */}
+            {/* XRPB Price Display */}
+            <div className="mt-6 flex justify-center">
+              <div className="bg-black/40 backdrop-blur-xl border border-[#39FF14]/30 rounded-2xl px-6 py-3">
+                <div className="flex items-center space-x-3">
+                  <DollarSign className="w-5 h-5 text-[#39FF14]" />
+                  <span className="text-white font-medium">
+                    XRPB Price: 
+                    {isLoadingPrice ? (
+                      <Loader2 className="w-4 h-4 animate-spin inline ml-2" />
+                    ) : (
+                      <span className="text-[#39FF14] font-bold ml-1">${xrpbPrice.toFixed(3)}</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Active Subscription Status */}
             {!membershipLoading && isSubscriptionActive && currentMembership && (
               <div className="mt-8 flex justify-center">
                 <div className="bg-gradient-to-r from-[#39FF14]/20 to-emerald-400/20 backdrop-blur-xl border-2 border-[#39FF14]/60 rounded-3xl p-8 max-w-2xl w-full">
@@ -373,7 +471,6 @@ export default function MembershipPage() {
                       )}
                     </p>
                     
-                    {/* Prominent Storefront Login Button */}
                     <Link
                       href="/storefront/login"
                       className="group relative inline-flex items-center px-8 py-4 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold text-lg hover:shadow-[0_0_50px_rgba(57,255,20,0.8)] transition-all duration-300 transform hover:scale-110 overflow-hidden"
@@ -408,11 +505,14 @@ export default function MembershipPage() {
                   <div className="flex items-center space-x-4">
                     <CheckCircle className="w-5 h-5 text-[#39FF14]" />
                     <span className="text-white font-medium">
-                      {connectedWallets.length} Wallet{connectedWallets.length > 1 ? 's' : ''} Connected
+                      {connectedWallets.length} XRPB Wallet{connectedWallets.length > 1 ? 's' : ''} Connected
                     </span>
                     <div className="flex space-x-2">
                       {connectedWallets.map((wallet, index) => (
-                        <span key={index} className="text-lg">{wallet.icon}</span>
+                        <div key={index} className="flex items-center space-x-1">
+                          <span className="text-lg">{wallet.icon}</span>
+                          <span className="text-xs text-[#39FF14]">{wallet.currency}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -452,9 +552,11 @@ export default function MembershipPage() {
                       {tier.icon}
                     </div>
                     <h3 className="text-2xl font-bold mb-4 text-white group-hover:text-[#39FF14] transition-colors duration-300">{tier.name}</h3>
-                    <div className="text-3xl font-black bg-gradient-to-r from-[#39FF14] to-emerald-400 bg-clip-text text-transparent mb-4">{tier.price}</div>
+                    <div className="text-3xl font-black bg-gradient-to-r from-[#39FF14] to-emerald-400 bg-clip-text text-transparent mb-2">{tier.price}</div>
                     {tier.priceUSD > 0 && (
-                      <div className="text-sm text-gray-400">${tier.priceUSD} USD equivalent</div>
+                      <div className="text-sm text-gray-400">
+                        ≈ {tier.priceXRPB} XRPB tokens
+                      </div>
                     )}
                   </div>
 
@@ -490,7 +592,7 @@ export default function MembershipPage() {
                 <p className="text-xl text-gray-300 leading-relaxed">Discover what makes RippleBids membership special</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {benefits.map((benefit, index) => (
                   <div key={index} className="group text-center p-6 bg-black/40 backdrop-blur-xl border border-[#39FF14]/20 rounded-2xl hover:border-[#39FF14]/40 transition-all duration-300 transform hover:scale-105">
                     <div className="w-16 h-16 bg-gradient-to-br from-[#39FF14]/20 to-emerald-400/20 rounded-2xl flex items-center justify-center mx-auto mb-6 text-[#39FF14] group-hover:shadow-[0_0_20px_rgba(57,255,20,0.3)] transition-all duration-300">
