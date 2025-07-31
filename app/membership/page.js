@@ -335,10 +335,16 @@ export default function MembershipPage() {
           throw new Error('Please connect your Phantom wallet first');
         }
         
+        // Create a wallet object with publicKey included
+        const walletWithPublicKey = {
+        ...wallet,
+        publicKey: publicKey
+        };
+        
         result = await sendSolanaXRPBPayment(
-          wallet, // Pass the entire wallet object
-          xrpbAmount, // Use calculated amount instead of hardcoded 1
-          connection
+        walletWithPublicKey,
+        xrpbAmount,
+        connection
         );
         break;
 
