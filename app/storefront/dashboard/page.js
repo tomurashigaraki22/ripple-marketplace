@@ -102,6 +102,35 @@ export default function StorefrontDashboard() {
     <StorefrontLayout>
       <div className="space-y-6">
         {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+    <h2 className="text-xl font-semibold text-white">Public Storefront</h2>
+    <Eye className="w-5 h-5 text-[#39FF14]" />
+  </div>
+  
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-400 mb-2">
+        Your Public Storefront URL
+      </label>
+      <div className="flex items-center space-x-2">
+        <input
+          type="text"
+          value={`${window.location.origin}/storefront/public/${user?.id}`}
+          readOnly
+          className="flex-1 px-3 py-2 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white focus:outline-none"
+        />
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(`${window.location.origin}/storefront/public/${user?.id}`)
+            alert('Link copied to clipboard!')
+          }}
+          className="px-4 py-2 bg-[#39FF14] text-black rounded-lg hover:bg-[#39FF14]/80 transition-colors font-medium"
+        >
+          Copy Link
+        </button>
+      </div>
+    </div>
+</div>        
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-white">Dashboard</h1>

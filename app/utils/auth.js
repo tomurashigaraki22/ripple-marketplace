@@ -34,6 +34,7 @@ export async function verifyUserAccess(request) {
         status: 404
       };
     }
+    console.log("Users: ", users[0])
 
     return {
       success: true,

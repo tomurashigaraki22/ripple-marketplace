@@ -9,6 +9,8 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getXRPBPriceInUSD, calculateXRPBAmount } from '../constructs/payments/signAndPay'
 import { ethers } from 'ethers'
 import { Clock } from 'lucide-react'; // or your preferred icon library
+import { useAuth } from '../context/AuthContext'
+import { useRouter } from 'next/navigation'
 
 export default function MembershipPage() {
   // Wallet contexts
@@ -16,12 +18,14 @@ export default function MembershipPage() {
   const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner } = useMetamask()
   const { publicKey, connected: solanaConnected, wallet, sendTransaction, signTransaction, signAllTransactions } = useWallet()
   const { connection } = useConnection()
+  const router = useRouter()
 
   // Payment states
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedTier, setSelectedTier] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const {user} = useAuth()
   const [paymentResult, setPaymentResult] = useState(null)
   const [connectedWallets, setConnectedWallets] = useState([])
   
@@ -294,6 +298,10 @@ export default function MembershipPage() {
 
   const handlePayment = async () => {
     if (!selectedTier || !paymentMethod) return;
+    if (!user){
+      router.push("/login")
+      return
+    }
 
     setIsProcessing(true);
     setPaymentResult(null);
@@ -391,6 +399,74 @@ export default function MembershipPage() {
         localStorage.setItem('membership_upgrade', JSON.stringify(membershipData))
         
         console.log('✅ Membership upgrade completed:', membershipData)
+        try {
+        const token = localStorage.getItem('authToken')
+        if (!token) {
+          throw new Error('Authentication token not found. Please log in again.')
+        }
+
+        const membershipResponse = await fetch('/api/membership/verify-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            tierName: selectedTier.name,
+            transactionHash: result.signature || result.txHash,
+            paymentMethod: paymentMethod.type,
+            amount: selectedTier.priceUSD,
+            currency: 'USD',
+            paymentUrl: result.paymentUrl,
+            verified: result.paymentData?.verified || true,
+            xummUuid: result.xummUuid
+          })
+        })
+
+        const membershipResult = await membershipResponse.json()
+        
+        if (membershipResponse.ok && membershipResult.success) {
+          console.log('🎉 Membership activated successfully:', membershipResult)
+          
+          // Update payment result with membership info
+          setPaymentResult({
+            ...result,
+            membershipActivated: true,
+            membershipData: membershipResult.membership,
+            storefrontCredentials: membershipResult.storefrontCredentials,
+            emailSent: membershipResult.emailSent,
+            isFirstTimeMember: membershipResult.isFirstTimeMember
+          })
+          
+          // Refresh membership status
+          await fetchCurrentMembership()
+          
+          // Show success message with additional info
+          if (membershipResult.storefrontCredentials && membershipResult.isFirstTimeMember) {
+            console.log('📧 Storefront credentials:', membershipResult.storefrontCredentials)
+            if (membershipResult.emailSent) {
+              console.log('✅ Storefront credentials sent to email')
+            } else {
+              console.log('⚠️ Email sending failed, but credentials are available')
+            }
+          }
+          
+        } else {
+          console.error('❌ Membership activation failed:', membershipResult)
+          throw new Error(membershipResult.error || 'Failed to activate membership')
+        }
+        
+      } catch (membershipError) {
+        console.error('❌ Membership API error:', membershipError)
+        
+        // Update payment result to show membership activation failed
+        setPaymentResult({
+          ...result,
+          membershipActivated: false,
+          membershipError: membershipError.message,
+          warning: 'Payment successful but membership activation failed. Please contact support.'
+        })
+      }
       }
 
     } catch (error) {

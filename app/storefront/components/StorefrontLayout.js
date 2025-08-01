@@ -2,7 +2,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Home, Package, Plus, BarChart3, Settings, User, LogOut, Menu, X, Store } from "lucide-react"
+import { Home, Package, Plus, BarChart3, Settings, User, LogOut, Menu, X, Store, Shield } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 
 export default function StorefrontLayout({ children }) {
@@ -15,6 +15,8 @@ export default function StorefrontLayout({ children }) {
     { name: 'Dashboard', href: '/storefront/dashboard', icon: Home },
     { name: 'My Listings', href: '/storefront/listings', icon: Package },
     { name: 'Add Listing', href: '/storefront/listings/new', icon: Plus },
+    { name: 'Orders', href: '/storefront/orders', icon: Package },
+    { name: 'Escrows', href: '/storefront/escrows', icon: Shield }, // Add this line
     { name: 'Analytics', href: '/storefront/analytics', icon: BarChart3 },
     { name: 'Profile', href: '/storefront/profile', icon: User },
     { name: 'Settings', href: '/storefront/settings', icon: Settings },

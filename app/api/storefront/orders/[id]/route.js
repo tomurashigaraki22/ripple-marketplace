@@ -43,7 +43,7 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const orderId = params.id
+    const orderId = await params?.id
     const body = await request.json()
     const { status, tracking_number, shipping_carrier, shipping_notes } = body
 
@@ -67,6 +67,15 @@ export async function PATCH(request, { params }) {
     if (status) {
       updateFields.push('status = ?')
       updateValues.push(status)
+      
+      // Add timestamps for status changes
+      if (status === 'shipped') {
+        updateFields.push('shipped_at = ?')
+        updateValues.push(new Date())
+      } else if (status === 'delivered') {
+        updateFields.push('delivered_at = ?')
+        updateValues.push(new Date())
+      }
     }
 
     if (tracking_number !== undefined) {
@@ -85,62 +94,23 @@ export async function PATCH(request, { params }) {
     }
 
     if (updateFields.length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
-    updateFields.push('updated_at = NOW()')
+    // Add updated_at
+    updateFields.push('updated_at = ?')
+    updateValues.push(new Date())
     updateValues.push(orderId)
 
-    // Update the order
     await db.query(
       `UPDATE orders SET ${updateFields.join(', ')} WHERE id = ?`,
       updateValues
     )
 
-    // Fetch updated order with details
-    const [updatedOrder] = await db.query(
-      `SELECT 
-        o.id,
-        o.amount,
-        o.status,
-        o.tracking_number,
-        o.shipping_carrier,
-        o.shipping_notes,
-        o.transaction_hash,
-        o.shipping_address,
-        o.created_at,
-        o.updated_at,
-        l.id as listing_id,
-        l.title as listing_title,
-        l.price as listing_price,
-        l.images as listing_images,
-        buyer.username as buyer_username,
-        buyer.email as buyer_email
-       FROM orders o
-       JOIN listings l ON o.listing_id = l.id
-       JOIN users buyer ON o.buyer_id = buyer.id
-       WHERE o.id = ?`,
-      [orderId]
-    )
-
-    const formattedOrder = {
-      ...updatedOrder[0],
-      amount: parseFloat(updatedOrder[0].amount),
-      listing_price: parseFloat(updatedOrder[0].listing_price),
-      listing_images: updatedOrder[0].listing_images ? JSON.parse(updatedOrder[0].listing_images) : [],
-      shipping_address: updatedOrder[0].shipping_address ? JSON.parse(updatedOrder[0].shipping_address) : null
-    }
-
-    return NextResponse.json({
-      success: true,
-      order: formattedOrder
-    })
+    return NextResponse.json({ success: true, message: 'Order updated successfully' })
   } catch (error) {
     console.error('Error updating order:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 

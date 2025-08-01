@@ -122,6 +122,45 @@ export async function initializeDatabase() {
       )
     `;
 
+    // Escrows table with dynamic conditions
+    const createEscrowsTable = `
+      CREATE TABLE IF NOT EXISTS escrows (
+        id VARCHAR(36) PRIMARY KEY,
+        seller VARCHAR(255) NOT NULL,
+        buyer VARCHAR(255) NOT NULL,
+        amount DECIMAL(20, 8) NOT NULL,
+        fee DECIMAL(20, 8) DEFAULT 0,
+        conditions JSON NOT NULL COMMENT 'Dynamic conditions stored as JSON object',
+        status ENUM('pending', 'funded', 'conditions_met', 'released', 'disputed', 'cancelled') DEFAULT 'pending',
+        transaction_hash VARCHAR(255),
+        release_hash VARCHAR(255),
+        dispute_reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_seller (seller),
+        INDEX idx_buyer (buyer),
+        INDEX idx_status (status)
+      )
+    `;
+
+    // Notifications table for seller wallet setup
+    const createNotificationsTable = `
+      CREATE TABLE IF NOT EXISTS notifications (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL,
+        type ENUM('wallet_setup', 'escrow_funded', 'order_received', 'payment_released') NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        data JSON COMMENT 'Additional notification data',
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_user_unread (user_id, is_read),
+        INDEX idx_type (type)
+      )
+    `;
+
     // Create tables in order (dependencies first)
     await db.query(createRolesTable);
     await db.query(createMembershipTiersTable);
@@ -130,6 +169,8 @@ export async function initializeDatabase() {
     await db.query(createListingsTable);
     await db.query(createOrdersTable);
     await db.query(createUserMembershipsTable);
+    await db.query(createEscrowsTable);
+    await db.query(createNotificationsTable);
 
     // Insert default roles (admin first - highest role)
     const insertDefaultRoles = `
@@ -181,13 +222,12 @@ export async function initializeDatabase() {
       }
     }
     
-    console.log('Database initialized successfully with normalized schema');
+    console.log('Database initialized successfully with normalized schema including escrows table');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
   }
 }
-
 
 // Export the password generation function
 export { generateRandomPassword };

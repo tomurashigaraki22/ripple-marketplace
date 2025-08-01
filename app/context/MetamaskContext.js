@@ -12,9 +12,9 @@ const MetamaskContext = createContext(null);
 
 // Define XRPL EVM Sidechain Testnet with CORRECT configuration
 const xrplEvmTestnet = defineChain({
-  id: 1449000, // XRPL EVM Testnet chain ID
-  name: 'XRPL EVM Sidechain Testnet',
-  network: 'xrpl-evm-testnet',
+  id: 1440000, // XRPL EVM Testnet chain ID
+  name: 'XRPL EVM Sidechain Mainnet',
+  network: 'xrpl-evm-mainnet',
   nativeCurrency: {
     decimals: 18,
     name: 'XRP',
@@ -22,16 +22,16 @@ const xrplEvmTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://rpc.testnet.xrplevm.org'],
+      http: ['https://rpc.xrplevm.org'],
     },
     public: {
-      http: ['https://rpc.testnet.xrplevm.org'],
+      http: ['https://rpc.xrplevm.org'],
     },
   },
   blockExplorers: {
     default: {
-      name: 'XRPL EVM Testnet Explorer',
-      url: 'https://evm-sidechain.peersyst.tech',
+      name: 'XRPL EVM Explorer',
+      url: 'https://explorer.xrplevm.org',
     },
   },
 });
@@ -65,7 +65,7 @@ const MetamaskProviderInner = ({ children }) => {
 
   // Auto-switch to XRPL EVM when connected but on wrong network
   useEffect(() => {
-    if (isConnected && address && chain && chain.id !== 1449000) {
+    if (isConnected && address && chain && chain.id !== 14440000) {
       console.log('Connected to wrong network, switching to XRPL EVM testnet...');
       switchToXRPLEVM();
     }
@@ -95,14 +95,15 @@ const MetamaskProviderInner = ({ children }) => {
     try {
       // Use Wagmi's switchChain for better mobile compatibility
       if (switchChain) {
-        await switchChain({ chainId: 1449000 });
+        await switchChain({ chainId: 1440000 });
         console.log('Successfully switched to XRPL EVM testnet via Wagmi');
         return;
       }
 
       // Fallback to direct MetaMask call
       if (typeof window !== 'undefined' && window.ethereum) {
-        const chainIdHex = '0x161c28';
+        // const chainIdHex = '0x161c28';
+        const chainIdHex = '0x15f900'
         
         try {
           await window.ethereum.request({
@@ -115,15 +116,15 @@ const MetamaskProviderInner = ({ children }) => {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [{
-                chainId: '0x161c28',
-                chainName: 'XRPL EVM Sidechain Testnet',
+                chainId: '0x15f900',
+                chainName: 'XRPL EVM Sidechain',
                 nativeCurrency: {
                   name: 'XRP',
                   symbol: 'XRP',
                   decimals: 18,
                 },
-                rpcUrls: ['https://rpc.testnet.xrplevm.org'],
-                blockExplorerUrls: ['https://evm-sidechain.peersyst.tech'],
+                rpcUrls: ['https://rpc.xrplevm.org'],
+                blockExplorerUrls: ['https://explorer.xrplevm.org'],
               }],
             });
             console.log('Successfully added and switched to XRPL EVM testnet');
@@ -133,11 +134,11 @@ const MetamaskProviderInner = ({ children }) => {
         }
       } else {
         console.warn('Cannot switch network: No wallet available');
-        alert('Please manually switch to XRPL EVM Testnet in your wallet');
+        alert('Please manually switch to XRPL EVM Mainnet in your wallet');
       }
     } catch (error) {
       console.error('Failed to switch to XRPL EVM testnet:', error);
-      alert('Failed to switch to XRPL EVM testnet. Please switch manually in your wallet.');
+      alert('Failed to switch to XRPL EVM Mainnet. Please switch manually in your wallet.');
     }
   };
 

@@ -38,8 +38,8 @@ export async function POST(request) {
 
       // Create user
       await db.query(
-        'INSERT INTO users (id, username, email, password) VALUES (?, ?, ?, ?)',
-        [userId, username, email, hashedPassword]
+        'INSERT INTO users (id, username, email, password, role_id) VALUES (?, ?, ?, ?, ?)',
+        [userId, username, email, hashedPassword, 3]
       );
 
       // Get created user

@@ -13,7 +13,7 @@ export async function GET(request) {
     const search = url.searchParams.get('search')
     const sortBy = url.searchParams.get('sortBy') || 'recent'
 
-    let whereClause = 'WHERE l.status = "approved"'
+    let whereClause = 'WHERE l.status = "approved" AND l.status != "sold"'
     const queryParams = []
 
     if (category && category !== 'all') {

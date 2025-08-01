@@ -5,122 +5,68 @@ import { v4 as uuidv4 } from 'uuid'
 // POST - Create a new order (purchase) - Fixed schema compatibility
 export async function POST(request) {
   try {
-    const { listing_id, amount, wallet_address, shipping_info } = await request.json()
+    const { listing_id, amount, order_type, buyer_id, shipping_info, escrow_id, transaction_hash, payment_chain } = await request.json();
 
-    // Validate required fields (removed order_type since it's not in schema)
-    if (!listing_id || !amount || !wallet_address) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+    if (!listing_id || !amount || !order_type || !buyer_id) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Verify listing exists and is approved
-    const [listings] = await db.query(
-      'SELECT * FROM listings WHERE id = ? AND status = "approved"',
-      [listing_id]
-    )
-
+    // Get listing details
+    const [listings] = await db.query('SELECT * FROM listings WHERE id = ?', [listing_id]);
     if (listings.length === 0) {
-      return NextResponse.json(
-        { error: 'Listing not found or not available' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
-    const listing = listings[0]
-
-    // Validate purchase amount
-    if (parseFloat(amount) !== parseFloat(listing.price)) {
-      return NextResponse.json(
-        { error: 'Purchase amount must match listing price' },
-        { status: 400 }
-      )
-    }
-
-    // Create a default buyer for anonymous orders
-    let buyer_id = null
+    const listing = listings[0];
+    const orderId = uuidv4();
     
-    // Try to find user by wallet address
-    const [walletUsers] = await db.query(
-      'SELECT user_id FROM wallet_addresses WHERE address = ?',
-      [wallet_address]
-    )
-    
-    if (walletUsers.length > 0) {
-      buyer_id = walletUsers[0].user_id
-    } else {
-      // Create anonymous buyer entry
-      buyer_id = uuidv4()
-      
-      // Create a temporary user for anonymous orders
-      const anonymousUsername = `anonymous_${Date.now()}`
-      const anonymousEmail = `${buyer_id}@anonymous.local`
-      
-      await db.query(
-        `INSERT INTO users (id, username, email, password, role_id, status) 
-         VALUES (?, ?, ?, ?, 1, 'active')`,
-        [buyer_id, anonymousUsername, anonymousEmail, 'anonymous']
-      )
-      
-      // Add wallet address for this anonymous user
-      await db.query(
-        `INSERT INTO wallet_addresses (id, user_id, chain, address, is_primary) 
-         VALUES (?, ?, 'evm', ?, true)`,
-        [uuidv4(), buyer_id, wallet_address]
-      )
-    }
+    // Create order with escrow information
+    const orderData = {
+      id: orderId,
+      listing_id,
+      buyer_id: buyer_id, // Use buyer_id from frontend
+      seller_id: listing.user_id, // Seller from listing
+      amount: parseFloat(amount),
+      transaction_hash: transaction_hash || null,
+      status: escrow_id ? 'escrow_funded' : 'pending',
+      shipping_address: shipping_info ? JSON.stringify(shipping_info) : null,
+      escrow_id: escrow_id || null, // Store escrow_id
+      payment_chain: payment_chain || null, // Store payment_chain
+      order_type: order_type || 'purchase', // Store order_type
+      created_at: new Date()
+    };
 
-    // Create order using actual schema columns
-    const orderId = uuidv4()
-    const [result] = await db.query(
-      `INSERT INTO orders (
-        id,
-        listing_id, 
-        buyer_id, 
-        seller_id, 
-        amount, 
-        status, 
-        shipping_address,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        orderId,
-        listing_id,
-        buyer_id,
-        listing.user_id,
-        amount,
-        'paid', // Set to paid since we're skipping payment
-        shipping_info ? JSON.stringify(shipping_info) : null
-      ]
-    )
-
-    // Update listing status to sold
     await db.query(
-      'UPDATE listings SET status = "sold" WHERE id = ?',
-      [listing_id]
-    )
+      `INSERT INTO orders (id, listing_id, buyer_id, seller_id, amount, transaction_hash, status, shipping_address, escrow_id, payment_chain, order_type, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [orderData.id, orderData.listing_id, orderData.buyer_id, orderData.seller_id, 
+       orderData.amount, orderData.transaction_hash, orderData.status, orderData.shipping_address, 
+       orderData.escrow_id, orderData.payment_chain, orderData.order_type, orderData.created_at]
+    );
 
-    // Get the created order
-    const [orders] = await db.query(
-      `SELECT o.*, l.title as listing_title
-       FROM orders o
-       JOIN listings l ON o.listing_id = l.id
-       WHERE o.id = ?`,
-      [orderId]
-    )
+    // Mark listing as sold when order is created with escrow
+    if (escrow_id) {
+      await db.query(
+        'UPDATE listings SET status = ? WHERE id = ?',
+        ['sold', listing_id]
+      );
+      
+      await db.query(
+        'UPDATE escrows SET status = ? WHERE id = ?',
+        ['funded', escrow_id]
+      );
+      console.log(`📧 Seller notification: New escrow order ${orderId} for listing ${listing_id}`);
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Order created successfully',
-      order: orders[0]
-    })
+    return NextResponse.json({ 
+      success: true, 
+      order: orderData,
+      message: escrow_id ? 'Escrow order created successfully' : 'Order created successfully'
+    });
+
   } catch (error) {
-    console.error('Error creating order:', error)
-    return NextResponse.json(
-      { error: 'Internal server error: ' + error.message },
-      { status: 500 }
-    )
+    console.error('Error creating order:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

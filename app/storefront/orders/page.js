@@ -55,9 +55,11 @@ export default function StorefrontOrders() {
       
       if (response.ok) {
         const data = await response.json()
-        setOrders(orders.map(order => 
-          order.id === orderId ? data.order : order
-        ))
+        setOrders(orders
+          .map(order => 
+            order.id === orderId ? data.order : order
+          )
+        )
         setShowShippingModal(false)
         setShippingData({ tracking_number: '', shipping_carrier: '', shipping_notes: '' })
       }
@@ -85,15 +87,18 @@ export default function StorefrontOrders() {
   }
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.buyer_username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.listing_title.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesStatus = filterStatus === 'all' || order.status === filterStatus
-    
-    return matchesSearch && matchesStatus
-  })
+  // Check if order exists first
+  if (!order) return false;
+  
+  const matchesSearch = 
+    (order.id?.toString().toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (order.buyer_username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (order.listing_title?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  
+  const matchesStatus = filterStatus === 'all' || order.status === filterStatus
+  
+  return matchesSearch && matchesStatus
+})
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -124,6 +129,65 @@ export default function StorefrontOrders() {
       maximumFractionDigits: 8
     }).format(amount)
   }
+
+    const handleSetWithdrawalAddress = async (orderId, chain) => {
+    const address = prompt(`Enter your ${chain.toUpperCase()} withdrawal address:`);
+    if (!address) return;
+
+    try {
+      const response = await fetch('/api/storefront/withdrawal-address', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          orderId,
+          withdrawalAddress: address,
+          chain
+        })
+      });
+
+      if (response.ok) {
+        alert('Withdrawal address set successfully!');
+        fetchOrders(); // Refresh orders
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error setting withdrawal address:', error);
+      alert('Failed to set withdrawal address');
+    }
+  };
+
+  const handleReleaseEscrow = async (escrowId) => {
+    if (!confirm('Are you sure you want to release the escrow? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/escrow/release', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({ escrowId })
+      });
+
+      if (response.ok) {
+        alert('Escrow released successfully! Funds have been transferred to your withdrawal address.');
+        fetchOrders(); // Refresh orders
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error releasing escrow:', error);
+      alert('Failed to release escrow');
+    }
+  };
 
   if (loading) {
     return (
@@ -196,6 +260,23 @@ export default function StorefrontOrders() {
                         <span className="ml-1 capitalize">{order.status}</span>
                       </span>
                     </div>
+                                {/* Add escrow management buttons in order cards */}
+            {order.escrow_id && order.status === 'escrow_funded' && (
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={() => handleSetWithdrawalAddress(order.id, order.payment_chain)}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Set Withdrawal Address
+                </button>
+                <button
+                  onClick={() => handleReleaseEscrow(order.escrow_id)}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Release Escrow (Delivery Complete)
+                </button>
+              </div>
+            )}
                     
                     <div className="flex items-center space-x-4 text-sm text-gray-400">
                       <div className="flex items-center space-x-2">
@@ -240,7 +321,7 @@ export default function StorefrontOrders() {
                   
                   {/* Actions */}
                   <div className="flex flex-col space-y-2">
-                    {order.status === 'paid' && (
+                    {(order.status === 'paid' || order.status === 'escrow_funded') && (
                       <button
                         onClick={() => handleShippingUpdate(order)}
                         className="bg-blue-500/10 text-blue-400 px-4 py-2 rounded-lg hover:bg-blue-500/20 transition-all duration-300 flex items-center space-x-2"
@@ -349,3 +430,7 @@ export default function StorefrontOrders() {
     </StorefrontLayout>
   )
 }
+
+
+// Add escrow-specific order management
+

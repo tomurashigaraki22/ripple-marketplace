@@ -331,7 +331,8 @@ export default function Navbar() {
               {/* Mobile Navigation */}
               <div className="space-y-2">
                 {[
-                  { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
+                  ...(!user ? [{ href: '/marketplace', label: 'Marketplace', icon: ShoppingBag }] : []),
+                ...(user ? [{ href: '/marketplace/orders', label: 'My Orders', icon: Package }] : []),
                   { href: '/membership', label: 'Membership', icon: Shield },
                   { href: '/portal', label: 'My Portal', icon: User },
                   { href: '/faqs', label: 'FAQs', icon: Globe }

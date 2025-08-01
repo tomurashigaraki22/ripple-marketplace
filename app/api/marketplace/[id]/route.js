@@ -4,7 +4,7 @@ import { db } from '../../../lib/db.js'
 // GET - Fetch specific listing details for marketplace
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    const { id } = await params // Await params before destructuring
     const url = new URL(request.url)
     const walletAddress = url.searchParams.get('wallet') // Connected wallet address
 

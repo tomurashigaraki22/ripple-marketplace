@@ -13,6 +13,7 @@ export default function MyOrdersPage() {
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [pagination, setPagination] = useState({ page: 1, totalPages: 0, total: 0 })
   const [connectedWallets, setConnectedWallets] = useState([])
+  const [confirmingOrder, setConfirmingOrder] = useState(null)
 
   // Wallet contexts
   const { xrpWalletAddress } = useXRPL()
@@ -89,6 +90,38 @@ export default function MyOrdersPage() {
       setLoading(false)
     }
   }
+
+  const handleMarkDelivered = async (orderId) => {
+  try {
+    setConfirmingOrder(orderId)
+    
+    // Get buyer_id from connected wallet or user context
+    const response = await fetch(`/api/orders/${orderId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        status: 'delivered',
+        buyer_id: connectedWallets[0]?.address // or get from user context
+      })
+    })
+
+    if (response.ok) {
+      // Refresh orders
+      fetchOrders()
+      alert('Order marked as delivered successfully!')
+    } else {
+      const error = await response.json()
+      alert(`Error: ${error.message}`)
+    }
+  } catch (error) {
+    console.error('Error marking order as delivered:', error)
+    alert('Failed to mark order as delivered')
+  } finally {
+    setConfirmingOrder(null)
+  }
+}
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -183,7 +216,7 @@ export default function MyOrdersPage() {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mt-10">
         {/* Header */}
         <div className="mb-8">
           {/* <div className="flex items-center mb-6">
@@ -248,8 +281,18 @@ export default function MyOrdersPage() {
         ) : (
           <div className="space-y-6">
             {orders.map((order) => {
-              const images = order.listing_images ? JSON.parse(order.listing_images) : []
+              let images = []
+              try {
+                images = order.listing_images ? JSON.parse(order.listing_images) : []
+              } catch (error) {
+                console.warn('Invalid JSON in listing_images:', order.listing_images)
+                // If it's a single URL string, wrap it in an array
+                if (typeof order.listing_images === 'string' && order.listing_images.startsWith('http')) {
+                  images = [order.listing_images]
+                }
+              }
               const mainImage = images[0] || '/placeholder-image.jpg'
+              const daysLeft = getDaysUntilAutoRelease(order.created_at)
               
               return (
                 <div
@@ -261,7 +304,7 @@ export default function MyOrdersPage() {
                     <div className="flex-shrink-0">
                       <div className="w-24 h-24 rounded-xl overflow-hidden border border-gray-700/50">
                         <Image
-                          src={mainImage}
+                          src={order.listing_images[0]}
                           alt={order.listing_title}
                           width={96}
                           height={96}
@@ -287,7 +330,7 @@ export default function MyOrdersPage() {
                         
                         <div className="text-right">
                           <div className="text-xl font-bold text-[#39FF14] mb-2">
-                            {order.amount} XRPB
+                            {order.amount} USD
                           </div>
                           <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full border text-sm font-medium ${getStatusColor(order.status)}`}>
                             {getStatusIcon(order.status)}
@@ -299,6 +342,11 @@ export default function MyOrdersPage() {
                       <div className="mt-4 flex items-center justify-between">
                         <div className="text-sm text-gray-400">
                           Ordered: {formatDate(order.created_at)}
+                          {order.status === 'escrow_funded' && daysLeft > 0 && (
+                            <div className="text-yellow-400 mt-1">
+                              ⏰ Auto-release in {daysLeft} days
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex items-center space-x-3">
@@ -309,6 +357,40 @@ export default function MyOrdersPage() {
                             <Eye className="w-4 h-4" />
                             <span>View Item</span>
                           </Link>
+
+                          {order.status === 'shipped' && (
+                            <button
+                              onClick={() => handleMarkDelivered(order.id)}
+                              disabled={confirmingOrder === order.id}
+                              className="inline-flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
+                            >
+                              {confirmingOrder === order.id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : (
+                                <>
+                                  <CheckCircle className="w-4 h-4" />
+                                  <span>Mark as Delivered</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                          
+                          {order.status === 'escrow_funded' && (
+    <button
+      onClick={() => handleConfirmReceived(order.id)}
+      disabled={confirmingOrder === order.id}
+      className="inline-flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
+    >
+      {confirmingOrder === order.id ? (
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+      ) : (
+        <>
+          <CheckCircle className="w-4 h-4" />
+          <span>Order Received</span>
+        </>
+      )}
+    </button>
+  )}
                         </div>
                       </div>
                       
@@ -316,7 +398,20 @@ export default function MyOrdersPage() {
                       {order.shipping_address && (
                         <div className="mt-4 p-3 bg-gray-900/50 rounded-lg">
                           <h4 className="text-sm font-medium text-gray-300 mb-1">Shipping Address:</h4>
-                          <p className="text-sm text-gray-400">{order.shipping_address}</p>
+                          <div className="text-sm text-gray-400">
+                            {typeof order.shipping_address === 'string' ? (
+                              <p>{order.shipping_address}</p>
+                            ) : (
+                              <div>
+                                <p>{order.shipping_address.address}</p>
+                                <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.zipCode}</p>
+                                <p>{order.shipping_address.country}</p>
+                                {order.shipping_address.phone && (
+                                  <p>Phone: {order.shipping_address.phone}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -354,4 +449,43 @@ export default function MyOrdersPage() {
       </div>
     </div>
   )
+}
+
+
+const handleConfirmReceived = async (orderId) => {
+  if (!confirm('Confirm that you have received this order? This will release the funds to the seller.')) {
+    return
+  }
+
+  setConfirmingOrder(orderId)
+  try {
+    const response = await fetch('/api/orders/confirm-received', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ orderId })
+    })
+
+    if (response.ok) {
+      alert('✅ Order confirmed! Funds have been released to the seller.')
+      fetchOrders() // Refresh orders
+    } else {
+      const error = await response.json()
+      alert(`Failed to confirm order: ${error.error}`)
+    }
+  } catch (error) {
+    console.error('Error confirming order:', error)
+    alert('Failed to confirm order')
+  } finally {
+    setConfirmingOrder(null)
+  }
+}
+
+
+const getDaysUntilAutoRelease = (createdAt) => {
+  const created = new Date(createdAt)
+  const now = new Date()
+  const daysPassed = Math.floor((now - created) / (1000 * 60 * 60 * 24))
+  return Math.max(0, 20 - daysPassed)
 }

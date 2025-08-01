@@ -102,11 +102,11 @@ const XRPB_TOKENS = {
     currencyDeets: '5852504200000000000000000000000000000000'
   },
   xrplEvm: {
-    address: '0x2557C801144b11503BB524C5503AcCd48E5F54fE',
+    address: '0x6d8630D167458b337A2c8b6242c354d2f4f75D96',
     decimals: 18,
-    network: 'testnet',
-    chainId: 1449000,
-    rpcUrl: 'https://rpc.testnet.xrplevm.org'
+    network: 'mainnet',
+    chainId: 1440000,
+    rpcUrl: 'https://rpc.xrplevm.org'
   }
 };
 
@@ -420,7 +420,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
     console.log('Transaction Hash:', txResponse.hash);
     console.log('Block Number:', receipt.blockNumber);
     console.log('Gas Used:', receipt.gasUsed.toString());
-    console.log('View on XRPL EVM Testnet Explorer:', `https://explorer.testnet.xrplevm.org/tx/${txResponse.hash}`);
+    console.log('View on XRPL EVM Mainnet Explorer:', `https://explorer.xrplevm.org/tx/${txResponse.hash}`);
     
     const paymentData = {
       blockchain: 'XRPL_EVM',
@@ -432,8 +432,8 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
       blockNumber: receipt.blockNumber,
       gasUsed: receipt.gasUsed.toString(),
       timestamp: new Date().toISOString(),
-      explorerUrl: `https://explorer.testnet.xrplevm.org/tx/${txResponse.hash}`,
-      network: 'testnet'
+      explorerUrl: `https://explorer.xrplevm.org/tx/${txResponse.hash}`,
+      network: 'mainnet'
     };
     
     localStorage.setItem(`xrpl_evm_xrpb_payment_${txResponse.hash}`, JSON.stringify(paymentData));

@@ -22,8 +22,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Function to fetch user data from API using token
+  const fetchUserData = async (token) => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        return userData;
+      }
+    } catch (error) {
+      console.error('Failed to fetch user data:', error);
+    }
+    return null;
+  };
+
   // Function to validate and set user from token
-  const validateAndSetUser = (token) => {
+  const validateAndSetUser = async (token) => {
     try {
       if (isTokenExpired(token)) {
         console.log('Token expired, logging out');
@@ -33,12 +52,33 @@ export const AuthProvider = ({ children }) => {
       
       const decodedUser = jwt.decode(token);
       if (decodedUser) {
-        // Create normalized user object with role from JWT
+        // Try to get stored user data first
+        const storedUserData = localStorage.getItem('userData');
+        let userData = null;
+        
+        if (storedUserData) {
+          try {
+            userData = JSON.parse(storedUserData);
+          } catch (e) {
+            console.error('Failed to parse stored user data:', e);
+          }
+        }
+        
+        // If no stored user data, fetch from API
+        if (!userData) {
+          userData = await fetchUserData(token);
+          if (userData) {
+            localStorage.setItem('userData', JSON.stringify(userData));
+          }
+        }
+        
+        // Create normalized user object
         const normalizedUser = {
-          ...decodedUser,
-          role: decodedUser.role, // Use role from JWT token
-          id: decodedUser.userId
+          ...userData,
+          role: decodedUser.role,
+          id: userData?.id || decodedUser.userId
         };
+        
         setUser(normalizedUser);
         setToken(token);
         return true;
@@ -51,17 +91,22 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // Check for both regular auth token and storefront token
-    const savedToken = localStorage.getItem('authToken') || localStorage.getItem('storefront_token')
-    if (savedToken) {
-      const isValid = validateAndSetUser(savedToken)
-      if (!isValid) {
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('storefront_token')
+    const initAuth = async () => {
+      // Check for both regular auth token and storefront token
+      const savedToken = localStorage.getItem('authToken') || localStorage.getItem('storefront_token');
+      if (savedToken) {
+        const isValid = await validateAndSetUser(savedToken);
+        if (!isValid) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('storefront_token');
+          localStorage.removeItem('userData');
+        }
       }
-    }
-    setLoading(false)
-  }, [])
+      setLoading(false);
+    };
+    
+    initAuth();
+  }, []);
 
   // Check token expiration periodically
   useEffect(() => {
@@ -90,13 +135,14 @@ export const AuthProvider = ({ children }) => {
       // Create normalized user object combining API response and JWT data
       const normalizedUser = {
         ...userData,
-        role: decodedToken.role, // Use role from JWT token
+        role: decodedToken.role,
         id: userData.id || decodedToken.userId
       };
       
       setToken(token);
       setUser(normalizedUser);
       localStorage.setItem('authToken', token);
+      localStorage.setItem('userData', JSON.stringify(userData)); // Store user data
       return true;
     } catch (error) {
       console.error('Failed to process login:', error);
@@ -108,7 +154,8 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('authToken');
-    localStorage.removeItem('storefront_token') // Also remove storefront token
+    localStorage.removeItem('storefront_token');
+    localStorage.removeItem('userData'); // Remove stored user data
   };
 
   return (
