@@ -156,7 +156,7 @@ export default function MembershipPage() {
   // Function to calculate XRPB amount from USD using dynamic pricing
   const calculateXRPBAmountDynamic = async (usdAmount) => {
     try {
-      const currentPrice = await getXRPBPriceInUSD();
+      const currentPrice = await getXRPBPriceInUSDEnhanced();
       if (currentPrice) {
         setXrpbPrice(currentPrice);
         return calculateXRPBAmount(usdAmount, currentPrice);
