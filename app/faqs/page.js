@@ -37,7 +37,7 @@ export default function FAQsPage() {
         {
           question: "What is XRPB token?",
           answer:
-            "XRPB is the native utility token of RippleBids. It&rsquo;s used for purchases, membership rewards, staking access, and unlocking premium features across the platform.",
+            "XRPB is the native utility token of RippleBids. It's used for purchases, membership rewards, staking access, and unlocking premium features across the platform.",
         },
         {
           question: "How can I get XRPB tokens?",
@@ -52,23 +52,28 @@ export default function FAQsPage() {
       ],
     },
     {
-      title: "Trading & Marketplace",
+      title: "Tokenomics",
       icon: <MessageCircle className="w-6 h-6" />,
       faqs: [
         {
-          question: "How do I place a bid?",
+          question: "What is the XRPB token allocation across different blockchains?",
           answer:
-            "To place a bid: 1) Navigate to the item you want, 2) Enter your bid amount (must be higher than current bid), 3) Confirm the transaction in your wallet, 4) Wait for confirmation.",
+            "XRPB tokens are distributed across three blockchains: <br/><br/><strong>XRPB EVM (3,029,940,000 tokens):</strong><br/>• DEX/Pre-Sale: 20% (600M tokens)<br/>• Community: 15% (450M tokens)<br/>• Marketing/Development: 11.67% (350M tokens)<br/>• Burn: 11.83% (355M tokens)<br/>• Locked Liquidity: 10.67% (300M tokens)<br/>• Board Holdings: 22% (665M tokens total)<br/>• Other allocations: Treasury, Payroll, Grants, Vested Liquidity<br/><br/><strong>XRPBL (100,000,000 tokens):</strong><br/>• Public Ecosystem: 90% (90M tokens)<br/>• Company Holdings: 10% (10M tokens)<br/><br/><strong>XRPB-SOL (999,939,600 tokens):</strong><br/>• Public Ecosystem: 94.23% (942M tokens)<br/>• Company Holdings: 5.72% (57M tokens)",
         },
         {
-          question: "What are the trading fees?",
+          question: "How are XRPB tokens used for governance and development?",
           answer:
-            "Trading fees vary by membership tier: Free tier (2.5%), Pro tier (1.5%), Premium tier (0.5%). Fees are automatically deducted from transactions.",
+            "XRPB tokens allocated for governance include board holdings for CEO (8.33%), CFO (5.5%), COO (5.5%), and CMO (5.5%). Development and marketing allocations range from 9.71% to 25% depending on the blockchain, ensuring continuous platform improvement and growth.",
         },
         {
-          question: "Can I cancel a bid?",
+          question: "What percentage of tokens are locked or reserved?",
           answer:
-            "Bids cannot be cancelled once placed, as they are recorded on the blockchain. Make sure you&rsquo;re comfortable with your bid amount before confirming.",
+            "Token security measures include: Locked Liquidity (10.67% on XRPB EVM, 20% on XRPBL, 68.14% on XRPB-SOL), Vested Liquidity (2.67% on XRPB EVM), and Reserve allocations (2.87-5%) for emergency use across all chains.",
+        },
+        {
+          question: "How does the burn mechanism work?",
+          answer:
+            "XRPB EVM has 11.83% (354,990,000 tokens) allocated for deflationary burns. This mechanism helps reduce the total supply over time, potentially increasing the value of remaining tokens in circulation.",
         },
       ],
     },
@@ -79,17 +84,17 @@ export default function FAQsPage() {
         {
           question: "What are the membership tiers?",
           answer:
-            "We offer three tiers: Free (basic access), Pro (100 XRPB/month with reduced fees and priority support), and Premium (500 XRPB/month with lowest fees and exclusive features).",
+            "We offer three tiers: Free (basic access), Pro (25 $/month with reduced fees and priority support), and Premium (50 $/month with lowest fees and exclusive features).",
         },
         {
           question: "How do I upgrade my membership?",
           answer:
-            "Visit the Membership page, select your desired tier, and pay with XRPB tokens (10% discount) or USDT. Your benefits activate immediately after payment confirmation.",
+            "Visit the Membership page, select your desired tier, and pay with XRPB tokens. Your benefits activate immediately after payment confirmation.",
         },
         {
           question: "Can I downgrade my membership?",
           answer:
-            "Yes, you can downgrade at any time. Changes take effect at the end of your current billing cycle, and you&rsquo;ll retain benefits until then.",
+            "Yes, you can downgrade at any time. Changes take effect at the end of your current billing cycle, and you'll retain benefits until then.",
         },
       ],
     },
@@ -162,7 +167,10 @@ export default function FAQsPage() {
 
                       {isOpen && (
                         <div className="px-6 py-4 bg-black/30 border-t border-gray-700">
-                          <p className="text-gray-300 leading-relaxed">{faq.answer}</p>
+                          <div 
+                            className="text-gray-300 leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: faq.answer }}
+                          />
                         </div>
                       )}
                     </div>
