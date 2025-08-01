@@ -292,6 +292,7 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
 export const sendXRPLXRPBPayment = async (wallet, amount) => {
   try {
     if (!wallet || !wallet.account) {
+      alert("This is the issue")
       throw new Error('XRPL Wallet not connected');
     }
 
@@ -308,6 +309,9 @@ export const sendXRPLXRPBPayment = async (wallet, amount) => {
     // Open XUMM payment request
     if (typeof window !== 'undefined') {
       window.open(paymentUrl, '_blank');
+    }
+    else{
+      window.open(paymentUrl, '_blank')
     }
     
     console.log('⏳ Monitoring for XRPB payment completion...');

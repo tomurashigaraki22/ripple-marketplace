@@ -349,12 +349,13 @@ export default function MembershipPage() {
               signTransaction,
               signAllTransactions
             },
-            2,
+            xrpbAmount,
             connection
           );
           break;
 
         case 'xrpl':
+          alert("Case is xrpl")
           setPaymentResult({
             success: false,
             pending: true,
@@ -363,7 +364,7 @@ export default function MembershipPage() {
           
           result = await sendXRPLXRPBPayment(
             { account: xrpWalletAddress },
-            1
+            xrpbAmount
           );
           break;
 
