@@ -981,13 +981,44 @@ export default function ProductDetailPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Escrow Fee (2.5%):</span>
-                    <span className="text-yellow-400">{(getPaymentAmount(parseFloat(listing.price), selectedPaymentMethod.type) * 0.025).toFixed(2)} XRPB</span>
+                    <span className="text-gray-300">
+                      Escrow Fee (
+                      {user.membership_tier_id === 1
+                        ? '3.5%'
+                        : user.membership_tier_id === 2
+                        ? '2.5%'
+                        : '1.5%'}
+                      ):
+                    </span>
+                    <span className="text-yellow-400">
+                      {(
+                        getPaymentAmount(parseFloat(listing.price), selectedPaymentMethod.type) *
+                        (user.membership_tier_id === 1
+                          ? 0.035
+                          : user.membership_tier_id === 2
+                          ? 0.025
+                          : 0.015)
+                      ).toFixed(2)}{' '}
+                      XRPB
+                    </span>
                   </div>
+
                   <div className="flex justify-between font-semibold border-t border-gray-600 pt-2">
                     <span className="text-gray-300">Total:</span>
-                    <span className="text-[#39FF14]">{(getPaymentAmount(parseFloat(listing.price), selectedPaymentMethod.type) * 1.025).toFixed(2)} XRPB</span>
+                    <span className="text-[#39FF14]">
+                      {(
+                        getPaymentAmount(parseFloat(listing.price), selectedPaymentMethod.type) *
+                        (1 +
+                          (user.membership_tier_id === 1
+                            ? 0.035
+                            : user.membership_tier_id === 2
+                            ? 0.025
+                            : 0.015))
+                      ).toFixed(2)}{' '}
+                      XRPB
+                    </span>
                   </div>
+
                   {listing.is_physical && (
                     <div className="flex justify-between">
                       <span className="text-gray-300">Shipping:</span>
