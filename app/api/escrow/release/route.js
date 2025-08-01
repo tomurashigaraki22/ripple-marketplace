@@ -57,6 +57,21 @@ export async function POST(request) {
 
     const escrow = escrows[0];
     
+    // **NEW: Check if associated order status is completed or delivered**
+    const [orders] = await db.query('SELECT * FROM orders WHERE escrow_id = ?', [escrowId]);
+    if (orders.length === 0) {
+      return NextResponse.json({ error: 'No order found for this escrow' }, { status: 404 });
+    }
+
+    const order = orders[0];
+    if (order.status !== 'completed' && order.status !== 'delivered') {
+      return NextResponse.json({ 
+        error: 'Cannot release escrow. Order must be completed or delivered first.',
+        current_order_status: order.status,
+        required_statuses: ['completed', 'delivered']
+      }, { status: 400 });
+    }
+    
     // Parse conditions
     let conditionsInfo = {};
     try {
