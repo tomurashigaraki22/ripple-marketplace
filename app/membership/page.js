@@ -355,7 +355,6 @@ export default function MembershipPage() {
           break;
 
         case 'xrpl':
-          alert("Case is xrpl")
           setPaymentResult({
             success: false,
             pending: true,

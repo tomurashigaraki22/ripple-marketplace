@@ -308,11 +308,37 @@ export const sendXRPLXRPBPayment = async (wallet, amount) => {
     
     // Open XUMM payment request
     if (typeof window !== 'undefined') {
-      window.open(paymentUrl, '_blank');
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  
+  if (isIOS) {
+    // For iOS, show confirmation before navigating
+    const userConfirmed = confirm(
+      'You will be redirected to XAMAN app to complete the payment. Continue?'
+    );
+    
+    if (userConfirmed) {
+      window.location.href = paymentUrl;
+    } else {
+      throw new Error('Payment cancelled by user');
     }
-    else{
-      window.open(paymentUrl, '_blank')
+  } else {
+    // For other platforms, try new tab first
+    const newWindow = window.open(paymentUrl, '_blank');
+    
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      const userConfirmed = confirm(
+        'Popup was blocked. Open payment page in current tab?'
+      );
+      
+      if (userConfirmed) {
+        window.location.href = paymentUrl;
+      } else {
+        throw new Error('Payment cancelled by user');
+      }
     }
+  }
+}
     
     console.log('⏳ Monitoring for XRPB payment completion...');
     console.log('Please complete the XRPB payment in XUMM app');
