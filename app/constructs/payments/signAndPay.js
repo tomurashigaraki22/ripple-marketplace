@@ -112,9 +112,9 @@ const XRPB_TOKENS = {
 
 // Payment recipient addresses (mainnet)
 const PAYMENT_RECIPIENTS = {
-  solana: '2ZTgNc4tCnZsrvMQtRu5fJGVwkhy6ZuZaAtUgDb9dxd5', // Updated to your mainnet address
-  xrpl: 'rEKpA2YoapyM8aTQGcEeCQVCaPKk1ZCCvA', 
-  xrplEvm: '0x5716dD191878F342A72633665F852bd0534B9Bc1'
+  solana: 'DmUKA3jpiBQwTBWfcuTuHqzC18AUrZpBWBfELzzhBgDS', // Updated to your mainnet address
+  xrpl: 'rhzLeTCodFnkB8vfCo6Nhj8gQXkMkjJFZp', 
+  xrplEvm: '0xDcE5A1057A8b85504289fbAB4694668580B06062'
 };
 
 /**

@@ -1,7 +1,34 @@
+"use client"
 import Link from "next/link"
-import { ArrowRight, Zap, Shield, Globe, Coins, Sparkles } from "lucide-react"
+import { ArrowRight, Zap, Shield, Globe, Coins, Sparkles, Eye, Package } from "lucide-react"
+import { useState, useEffect } from "react"
 
 export default function HomePage() {
+  const [popularListings, setPopularListings] = useState([])
+  const [loadingListings, setLoadingListings] = useState(true)
+
+  useEffect(() => {
+    fetchPopularListings()
+  }, [])
+
+  const fetchPopularListings = async () => {
+    try {
+      setLoadingListings(true)
+      // Fetch listings sorted by popularity (views)
+      const response = await fetch('/api/marketplace?sortBy=popular&limit=20')
+      if (response.ok) {
+        const data = await response.json()
+        // Filter listings with >150 views and take maximum 5
+        const popularItems = data.listings.filter(listing => listing.views > 150).slice(0, 5)
+        setPopularListings(popularItems)
+      }
+    } catch (error) {
+      console.error('Error fetching popular listings:', error)
+    } finally {
+      setLoadingListings(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       {/* Animated Background */}
@@ -35,17 +62,6 @@ export default function HomePage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
-            {/* <Link
-              href="/claim"
-              className="group relative px-10 py-5 bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black rounded-2xl font-bold text-lg hover:shadow-[0_0_40px_rgba(57,255,20,0.6)] transition-all duration-300 transform hover:scale-105 overflow-hidden"
-            >
-              <span className="absolute inset-0 bg-gradient-to-r from-[#39FF14] to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl"></span>
-              <span className="relative flex items-center gap-2">
-                <Coins className="w-5 h-5" />
-                Claim Tokens
-              </span>
-            </Link> */}
-            
             <Link
               href="/wallet"
               className="group relative px-10 py-5 bg-black/40 backdrop-blur-xl border-2 border-[#39FF14]/50 text-[#39FF14] rounded-2xl font-bold text-lg hover:border-[#39FF14] hover:shadow-[0_0_30px_rgba(57,255,20,0.3)] transition-all duration-300 transform hover:scale-105"
@@ -186,48 +202,83 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* Popular Listings Section */}
       <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900/50 to-black"></div>
         <div className="relative max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent">How It Works</h2>
-            <p className="text-xl text-gray-300">Get started in three simple steps</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent">Popular Listings</h2>
+            <p className="text-xl text-gray-300">Trending items with high demand in our marketplace</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="text-center group">
-              <div className="relative mb-8">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#39FF14] to-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(57,255,20,0.4)] group-hover:shadow-[0_0_50px_rgba(57,255,20,0.6)] transition-all duration-300">
-                  <span className="text-black font-black text-2xl">1</span>
-                </div>
-                <div className="absolute top-1/2 left-full w-full h-0.5 bg-gradient-to-r from-[#39FF14] to-transparent hidden md:block"></div>
+          {loadingListings ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-[#39FF14]/30 border-t-[#39FF14] rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-white/30 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
               </div>
-              <h3 className="text-2xl font-bold mb-4 text-white group-hover:text-[#39FF14] transition-colors duration-300">Connect Wallet</h3>
-              <p className="text-gray-400 leading-relaxed">Connect your XUMM, MetaMask, or Phantom wallet to get started with secure authentication</p>
             </div>
-            
-            <div className="text-center group">
-              <div className="relative mb-8">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#39FF14] to-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(57,255,20,0.4)] group-hover:shadow-[0_0_50px_rgba(57,255,20,0.6)] transition-all duration-300">
-                  <span className="text-black font-black text-2xl">2</span>
-                </div>
-                <div className="absolute top-1/2 left-full w-full h-0.5 bg-gradient-to-r from-[#39FF14] to-transparent hidden md:block"></div>
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-white group-hover:text-[#39FF14] transition-colors duration-300">Claim or Buy XRPB</h3>
-              <p className="text-gray-400 leading-relaxed">Get your XRPB tokens through our exclusive airdrop or purchase them directly from the marketplace</p>
+          ) : popularListings.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
+              {popularListings.map((listing, index) => (
+                <Link key={listing.id} href={`/marketplace/${listing.id}`}>
+                  <div className="group relative bg-black/40 backdrop-blur-xl border border-[#39FF14]/20 rounded-3xl overflow-hidden hover:border-[#39FF14]/60 transition-all duration-500 transform hover:scale-105 hover:shadow-[0_0_50px_rgba(57,255,20,0.2)] cursor-pointer">
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    
+                    {/* Image */}
+                    <div className="relative h-48 overflow-hidden">
+                      {listing.images && listing.images.length > 0 ? (
+                        <img 
+                          src={listing.images[0]} 
+                          alt={listing.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center">
+                          <Package className="w-12 h-12 text-gray-400" />
+                        </div>
+                      )}
+                      
+                      {/* Views Badge */}
+                      <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full flex items-center space-x-1">
+                        <Eye className="w-4 h-4 text-[#39FF14]" />
+                        <span className="text-white text-sm font-medium">{listing.views}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="relative p-6">
+                      <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#39FF14] transition-colors duration-300 line-clamp-2">
+                        {listing.title}
+                      </h3>
+                      
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm text-gray-400 capitalize">{listing.category}</span>
+                        <span className="text-sm text-[#39FF14] font-medium uppercase">{listing.chain}</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-2xl font-bold text-[#39FF14]">{listing.price} XRPB</p>
+                          <p className="text-sm text-gray-400">by @{listing.seller_username}</p>
+                        </div>
+                        
+                        <div className="w-10 h-10 bg-gradient-to-br from-[#39FF14] to-emerald-400 rounded-full flex items-center justify-center group-hover:shadow-[0_0_20px_rgba(57,255,20,0.5)] transition-all duration-300">
+                          <ArrowRight className="w-5 h-5 text-black group-hover:translate-x-1 transition-transform duration-300" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
-            
-            <div className="text-center group">
-              <div className="relative mb-8">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#39FF14] to-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(57,255,20,0.4)] group-hover:shadow-[0_0_50px_rgba(57,255,20,0.6)] transition-all duration-300">
-                  <span className="text-black font-black text-2xl">3</span>
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold mb-4 text-white group-hover:text-[#39FF14] transition-colors duration-300">Start Bidding</h3>
-              <p className="text-gray-400 leading-relaxed">Browse the marketplace and start bidding on exclusive items with your XRPB tokens</p>
+          ) : (
+            <div className="text-center py-20">
+              <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">No Popular Listings Yet</h3>
+              <p className="text-gray-400">Check back soon for trending items with high demand!</p>
             </div>
-          </div>
+          )}
 
           <div className="text-center mt-16">
             <Link
@@ -236,7 +287,7 @@ export default function HomePage() {
             >
               <span className="absolute inset-0 bg-gradient-to-r from-[#39FF14] to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl"></span>
               <span className="relative flex items-center gap-3">
-                Explore Marketplace
+                Explore All Listings
                 <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform duration-300" />
               </span>
             </Link>
