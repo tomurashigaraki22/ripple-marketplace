@@ -15,7 +15,7 @@ import { useRouter } from 'next/navigation'
 export default function MembershipPage() {
   // Wallet contexts
   const { xrpWalletAddress, xrplWallet, xrpbBalance } = useXRPL()
-  const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner } = useMetamask()
+  const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner, switchToXRPLEVM } = useMetamask()
   const { publicKey, connected: solanaConnected, wallet, sendTransaction, signTransaction, signAllTransactions } = useWallet()
   const { connection } = useConnection()
   const router = useRouter()
