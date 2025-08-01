@@ -1,6 +1,8 @@
 "use client"
+
 import { useState } from "react"
 import { ChevronDown, ChevronUp, Search, Book, HelpCircle, MessageCircle } from "lucide-react"
+import Link from "next/link"
 
 export default function FAQsPage() {
   const [openFAQ, setOpenFAQ] = useState(null)
@@ -189,36 +191,46 @@ export default function FAQsPage() {
           <h3 className="text-2xl font-bold mb-4">Still Need Help?</h3>
           <p className="text-gray-300 mb-6">Can&rsquo;t find what you&rsquo;re looking for? Our support team is here to help.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-6 py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all">
+            <a 
+              href="mailto:support@ripplebids.com"
+              className="px-6 py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all"
+            >
               Contact Support
-            </button>
-            <button className="px-6 py-3 neon-border rounded-lg font-semibold hover:neon-glow transition-all">
+            </a>
+            <a 
+              href="https://discord.gg/NDz7zWuG"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 neon-border rounded-lg font-semibold hover:neon-glow transition-all"
+            >
               Join Discord
-            </button>
+            </a>
           </div>
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-          <div className="card-glow p-6 rounded-lg text-center">
-            <Book className="w-8 h-8 text-[#39FF14] mx-auto mb-4" />
-            <h4 className="font-semibold mb-2">Documentation</h4>
-            <p className="text-sm text-gray-400 mb-4">Comprehensive guides and tutorials</p>
-            <button className="text-[#39FF14] hover:underline">Read Docs</button>
-          </div>
-
-          <div className="card-glow p-6 rounded-lg text-center">
-            <HelpCircle className="w-8 h-8 text-[#39FF14] mx-auto mb-4" />
-            <h4 className="font-semibold mb-2">Wallet Setup</h4>
-            <p className="text-sm text-gray-400 mb-4">Learn how to connect your wallet</p>
-            <button className="text-[#39FF14] hover:underline">Setup Guide</button>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
           <div className="card-glow p-6 rounded-lg text-center">
             <MessageCircle className="w-8 h-8 text-[#39FF14] mx-auto mb-4" />
             <h4 className="font-semibold mb-2">Community</h4>
             <p className="text-sm text-gray-400 mb-4">Join our community discussions</p>
-            <button className="text-[#39FF14] hover:underline">Join Now</button>
+            <a 
+              href="https://discord.gg/NDz7zWuG"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#39FF14] hover:underline"
+            >
+              Join Now
+            </a>
+          </div>
+
+          <div className="card-glow p-6 rounded-lg text-center">
+            <Book className="w-8 h-8 text-[#39FF14] mx-auto mb-4" />
+            <h4 className="font-semibold mb-2">Terms of Service</h4>
+            <p className="text-sm text-gray-400 mb-4">Read our terms and conditions</p>
+            <Link href="/legal/terms" className="text-[#39FF14] hover:underline">
+              Read Terms
+            </Link>
           </div>
         </div>
       </div>

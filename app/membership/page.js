@@ -11,6 +11,8 @@ import { ethers } from 'ethers'
 import { Clock } from 'lucide-react'; // or your preferred icon library
 import { useAuth } from '../context/AuthContext'
 import { useRouter } from 'next/navigation'
+  import { getXRPBPriceInUSDEnhanced } from '../constructs/payments/signAndPay';
+
 
 export default function MembershipPage() {
   // Wallet contexts
@@ -171,21 +173,29 @@ export default function MembershipPage() {
   };
 
   // Function to fetch XRPB price with dynamic pricing
+  // Usage in Your Components
+  
+  // Update your membership page to use the enhanced function:
+  // Import the enhanced function
+  
+  // Update your fetchXRPBPrice function
   const fetchXRPBPrice = async () => {
     setIsLoadingPrice(true);
     try {
-      const dynamicPrice = await getXRPBPriceInUSD();
+      // Use enhanced function with GeckoTerminal priority
+      const dynamicPrice = await getXRPBPriceInUSDEnhanced();
       if (dynamicPrice) {
         setXrpbPrice(dynamicPrice);
         console.log('✅ Dynamic XRPB price fetched:', dynamicPrice);
+        
+        // Optionally fetch additional pool stats
       } else {
-        // Fallback price
         setXrpbPrice(3.10);
         console.warn('⚠️ Using fallback XRPB price: $3.10');
       }
     } catch (error) {
       console.error('Error fetching XRPB price:', error);
-      setXrpbPrice(3.10); // Fallback price
+      setXrpbPrice(3.10);
     } finally {
       setIsLoadingPrice(false);
     }

@@ -157,22 +157,22 @@ export default function AdminDashboard() {
               Quick Actions
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              <button className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-all text-left">
+              <button onClick={() => router.push("/admin/users")} className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-all text-left">
                 <Users className="w-6 h-6 text-blue-400 mb-2" />
                 <p className="text-white font-medium">Manage Users</p>
                 <p className="text-gray-400 text-xs">View and edit users</p>
               </button>
-              <button className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition-all text-left">
+              <button onClick={() => router.push("/admin/listings")} className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition-all text-left">
                 <Package className="w-6 h-6 text-green-400 mb-2" />
                 <p className="text-white font-medium">Review Listings</p>
                 <p className="text-gray-400 text-xs">{stats.pendingListings} pending</p>
               </button>
-              <button className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg hover:bg-purple-500/20 transition-all text-left">
+              <button onClick={() => router.push("/admin/orders")} className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg hover:bg-purple-500/20 transition-all text-left">
                 <CreditCard className="w-6 h-6 text-purple-400 mb-2" />
                 <p className="text-white font-medium">View Orders</p>
                 <p className="text-gray-400 text-xs">Process orders</p>
               </button>
-              <button className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/20 transition-all text-left">
+              <button onClick={() => router.push("/admin/analytics")} className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/20 transition-all text-left">
                 <TrendingUp className="w-6 h-6 text-yellow-400 mb-2" />
                 <p className="text-white font-medium">Analytics</p>
                 <p className="text-gray-400 text-xs">View reports</p>

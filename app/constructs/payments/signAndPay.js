@@ -711,3 +711,69 @@ export const monitorXRPLXRPBTransactions = async (destinationAddress, expectedAm
 export const sendSolanaPayment = sendSolanaXRPBPayment;
 export const sendXRPPayment = sendXRPLXRPBPayment;
 export const sendEVMPayment = sendXRPLEvmXRPBPayment;
+
+/**
+ * Enhanced XRPB price fetching with GeckoTerminal as primary source
+ * @returns {Promise<number|null>} XRPB price in USD or null if error
+ */
+export const getXRPBPriceInUSDEnhanced = async () => {
+  const sources = [
+    // Source 1: GeckoTerminal API (most accurate for this specific pool)
+    async () => {
+      return await getXRPBPriceFromGeckoTerminal();
+    },
+    
+    // Source 2: Your existing DEX pair method (fallback)
+    async () => {
+      const provider = new ethers.JsonRpcProvider(RPC_URL);
+      const pair = new ethers.Contract(PAIR_ADDRESS, PAIR_ABI, provider);
+      
+      const token0 = await pair.token0();
+      const token1 = await pair.token1();
+      const [reserve0, reserve1] = await pair.getReserves();
+      
+      let reserveXRPB, reserveXRP;
+      if (token0.toLowerCase() === XRPB_ADDRESS.toLowerCase()) {
+        reserveXRPB = reserve0;
+        reserveXRP = reserve1;
+      } else {
+        reserveXRPB = reserve1;
+        reserveXRP = reserve0;
+      }
+      
+      const priceInXRP = Number(reserveXRP) / Number(reserveXRPB);
+      
+      const xrpResponse = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd"
+      );
+      const xrpData = await xrpResponse.json();
+      
+      return priceInXRP * xrpData.ripple.usd;
+    },
+    
+    // Source 3: Direct CoinGecko (if XRPB is listed)
+    async () => {
+      const response = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=xrpb&vs_currencies=usd"
+      );
+      const data = await response.json();
+      return data.xrpb?.usd || null;
+    }
+  ];
+  
+  for (let i = 0; i < sources.length; i++) {
+    try {
+      console.log(`🔄 Trying price source ${i + 1}...`);
+      const price = await sources[i]();
+      if (price && price > 0) {
+        console.log(`✅ Price fetched from source ${i + 1}: $${price.toFixed(6)}`);
+        return price;
+      }
+    } catch (error) {
+      console.warn(`⚠️ Source ${i + 1} failed:`, error.message);
+    }
+  }
+  
+  console.warn('⚠️ All price sources failed, using fallback');
+  return 3.10; // Fallback price
+};

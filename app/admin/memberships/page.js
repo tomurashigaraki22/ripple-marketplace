@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Users, Shield, TrendingUp, DollarSign, Calendar, Search, Filter, Eye, Edit, Trash2, Plus } from "lucide-react"
+import { Users, Shield, TrendingUp, DollarSign, Calendar, Search, Filter, Eye, Edit, Trash2, Plus, Gift, X } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { useRouter } from "next/navigation"
 import AdminLayout from "../components/AdminLayout"
@@ -8,6 +8,7 @@ import AdminLayout from "../components/AdminLayout"
 export default function AdminMemberships() {
   const [memberships, setMemberships] = useState([])
   const [membershipTiers, setMembershipTiers] = useState([])
+  const [allUsers, setAllUsers] = useState([])
   const [stats, setStats] = useState({
     totalMemberships: 0,
     activeMemberships: 0,
@@ -18,7 +19,14 @@ export default function AdminMemberships() {
   const [filterTier, setFilterTier] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const { user, token } = useAuth() // Make sure to destructure token
+  const [showGrantModal, setShowGrantModal] = useState(false)
+  const [grantForm, setGrantForm] = useState({
+    userId: '',
+    tierName: 'pro',
+    months: 1
+  })
+  const [isGranting, setIsGranting] = useState(false)
+  const { user, token } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -26,12 +34,13 @@ export default function AdminMemberships() {
       router.push('/admin/login')
       return
     }
-    if (token) { // Only fetch when token is available
+    if (token) {
       fetchMemberships()
       fetchMembershipTiers()
       fetchStats()
+      fetchAllUsers()
     }
-  }, [user, router, token]) // Add token to dependencies
+  }, [user, router, token])
 
   const fetchMemberships = async () => {
     try {
@@ -75,6 +84,57 @@ export default function AdminMemberships() {
       setStats(data.stats || stats)
     } catch (error) {
       console.error('Failed to fetch membership stats:', error)
+    }
+  }
+
+  const fetchAllUsers = async () => {
+    try {
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      const data = await response.json()
+      setAllUsers(data.users || [])
+    } catch (error) {
+      console.error('Failed to fetch users:', error)
+    }
+  }
+
+  const handleGrantMembership = async (e) => {
+    e.preventDefault()
+    setIsGranting(true)
+
+    try {
+      const response = await fetch('/api/admin/memberships', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(grantForm)
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        try {
+        alert(`Successfully granted ${grantForm.months} months of ${grantForm.tierName} membership!\n\n`)
+        setShowGrantModal(false)
+        setGrantForm({ userId: '', tierName: 'pro', months: 1 })
+        await fetchMemberships() // Refresh the list
+        } catch (error) {
+          console.error("Error: ", error)
+        }
+      } else {
+        alert(`Error: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Error granting membership:', error)
+      alert('Failed to grant membership')
+    } finally {
+      setIsGranting(false)
     }
   }
 
@@ -144,13 +204,15 @@ export default function AdminMemberships() {
             <h1 className="text-3xl font-bold text-white">Membership Management</h1>
             <p className="text-gray-400 mt-2">Manage user memberships and tiers</p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-[#39FF14] to-cyan-400 text-black rounded-lg font-semibold hover:shadow-lg transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Create Membership</span>
-          </button>
+          <div className="flex space-x-4">
+            <button
+              onClick={() => setShowGrantModal(true)}
+              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+            >
+              <Gift className="w-5 h-5" />
+              <span>Grant Membership</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -208,6 +270,90 @@ export default function AdminMemberships() {
             </div>
           </div>
         </div>
+
+        {/* Grant Membership Modal */}
+        {showGrantModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-black/90 border border-white/10 rounded-2xl p-8 max-w-md w-full mx-4">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-white">Grant Membership</h3>
+                <button
+                  onClick={() => setShowGrantModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleGrantMembership} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Select User
+                  </label>
+                  <select
+                    value={grantForm.userId}
+                    onChange={(e) => setGrantForm({...grantForm, userId: e.target.value})}
+                    className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                    required
+                  >
+                    <option value="">Choose a user...</option>
+                    {allUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.username} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Membership Tier
+                  </label>
+                  <select
+                    value={grantForm.tierName}
+                    onChange={(e) => setGrantForm({...grantForm, tierName: e.target.value})}
+                    className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                  >
+                    <option value="pro">Pro</option>
+                    <option value="premium">Premium</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Duration (Months)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={grantForm.months}
+                    onChange={(e) => setGrantForm({...grantForm, months: parseInt(e.target.value)})}
+                    className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowGrantModal(false)}
+                    className="flex-1 px-6 py-3 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isGranting}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+                  >
+                    {isGranting ? 'Granting...' : 'Grant Membership'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Memberships Table */}
         <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
