@@ -899,31 +899,38 @@ export const getXRPBPriceFromSolana = async () => {
 };
 
 /**
- * Get XRPB price from XRPL using the new API (returns price in XRP, not USD)
+ * Get XRPB price from XRPL using OnTheDex API (returns price in USD)
  */
 export const getXRPBPriceFromXRPL = async () => {
   try {
-    const response = await fetch('https://dropserver.shop/api/price/xrpl');
+    const response = await fetch('https://api.onthedex.live/public/v1/aggregator', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tokens: ['XRPB.rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT']
+      })
+    });
     
     if (response.ok) {
       const data = await response.json();
       
-      if (data.success && data.price) {
-        // Extract numeric value from XRP price string (e.g., "0.000241 XRP" -> 0.000241)
-        const xrpPriceValue = parseFloat(data.price.replace(' XRP', ''));
+      // Check if we have tokens data
+      if (data.tokens && Array.isArray(data.tokens) && data.tokens.length > 0) {
+        const token = data.tokens[0];
         
-        if (xrpPriceValue && xrpPriceValue > 0) {
-          console.log('✅ XRPB price from XRPL API (in XRP):', xrpPriceValue);
-          // Return the XRP price directly - no USD conversion
-          return xrpPriceValue;
+        if (token.price_usd && typeof token.price_usd === 'number') {
+          console.log('✅ XRPB price from OnTheDex API (USD):', token.price_usd);
+          return token.price_usd;
         }
       }
     }
     
-    console.warn('⚠️ Could not fetch XRPB price from XRPL API');
+    console.warn('⚠️ Could not fetch XRPB price from OnTheDex API');
     return null;
   } catch (error) {
-    console.error('❌ Error fetching XRPB price from XRPL API:', error);
+    console.error('❌ Error fetching XRPB price from OnTheDex API:', error);
     return null;
   }
 };
