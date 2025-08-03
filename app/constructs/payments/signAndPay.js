@@ -869,7 +869,7 @@ export const getXRPBPriceFromGeckoTerminal = async () => {
  */
 export const getXRPBPriceFromSolana = async () => {
   try {
-    const response = await fetch('http://148.113.201.195:1256/api/price/solana');
+    const response = await fetch('https://dropserver.shop/api/price/solana');
     
     if (response.ok) {
       const data = await response.json();
@@ -898,7 +898,7 @@ export const getXRPBPriceFromSolana = async () => {
  */
 export const getXRPBPriceFromXRPL = async () => {
   try {
-    const response = await fetch('http://148.113.201.195:1256/api/price/xrpl');
+    const response = await fetch('https://dropserver.shop/api/price/xrpl');
     
     if (response.ok) {
       const data = await response.json();
@@ -947,7 +947,7 @@ export const getAllXRPBPrices = async () => {
     
     // Try to get both prices from the combined endpoint first
     try {
-      const bothResponse = await fetch('http://148.113.201.195:1256/api/price/both');
+      const bothResponse = await fetch('https://dropserver.shop/api/price/both');
       
       if (bothResponse.ok) {
         const bothData = await bothResponse.json();
