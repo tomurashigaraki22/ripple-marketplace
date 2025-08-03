@@ -7,7 +7,7 @@ import { useXRPL } from '../../context/XRPLContext'
 import { useMetamask } from '../../context/MetamaskContext'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { createEscrowPayment } from '../../constructs/payments/escrowPayment.js'
-import { getXRPBPriceInUSD, calculateXRPBAmount, sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getAllXRPBPrices } from '../../constructs/payments/signAndPay'
+import { getXRPBPriceInUSD, calculateXRPBAmount, sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getAllXRPBPrices } from '../../constructs/payments/buyThings'
 import { useAuth } from "@/app/context/AuthContext"
 
 export default function ProductDetailPage() {
