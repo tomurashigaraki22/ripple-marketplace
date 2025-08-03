@@ -15,7 +15,7 @@ import { getXRPBPriceInUSDEnhanced, getXRPBPriceFromGeckoTerminal } from '../con
 
 export default function MembershipPage() {
   // Wallet contexts
-  const { xrpWalletAddress, xrplWallet, xrpbBalance } = useXRPL()
+  const { xrpWalletAddress, xrplWallet, xrpbBalance, setupXRPBTrustline, checkXRPBTrustline } = useXRPL()
   const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner, switchToXRPLEVM } = useMetamask()
   const { publicKey, connected: solanaConnected, wallet, sendTransaction, signTransaction, signAllTransactions } = useWallet()
   const { connection } = useConnection()
@@ -122,7 +122,41 @@ export default function MembershipPage() {
   // XRPB price and conversion states
   const [xrpbPrice, setXrpbPrice] = useState(3.10) // Default $0.10 per XRPB
   const [isLoadingPrice, setIsLoadingPrice] = useState(false)
+  
+  // Trustline states
+  const [hasTrustline, setHasTrustline] = useState(false)
+  const [isSettingUpTrustline, setIsSettingUpTrustline] = useState(false)
+  const [trustlineResult, setTrustlineResult] = useState(null)
 
+  // Check trustline when wallet connects
+  useEffect(() => {
+    if (xrpWalletAddress) {
+      checkXRPBTrustline().then(setHasTrustline)
+    }
+  }, [xrpWalletAddress])
+  
+  // Handle trustline setup
+  const handleSetupTrustline = async () => {
+    setIsSettingUpTrustline(true)
+    setTrustlineResult(null)
+    
+    try {
+      const result = await setupXRPBTrustline()
+      setTrustlineResult(result)
+      
+      if (result.success) {
+        setHasTrustline(true)
+      }
+    } catch (error) {
+      setTrustlineResult({
+        success: false,
+        message: error.message || 'Failed to setup trustline'
+      })
+    } finally {
+      setIsSettingUpTrustline(false)
+    }
+  }
+  
   // Update connected wallets with XRPB token info
   useEffect(() => {
     const wallets = []
@@ -614,10 +648,87 @@ export default function MembershipPage() {
             </p>
             
             {/* XRPB Price Display */}
-            <div className="mb-16">
+            <div className="mb-8">
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/10 to-emerald-400/10 rounded-3xl blur-xl"></div>
               <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-8 rounded-3xl">
+              
+              {/* XRPB Trustline Setup Section */}
+              {xrpWalletAddress && (
+                <div className="max-w-4xl mx-auto mb-8">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/10 to-emerald-400/10 rounded-3xl blur-xl"></div>
+                    <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-8 rounded-3xl">
+                      <div className="text-center">
+                        <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent flex items-center justify-center">
+                          <Wallet className="w-6 h-6 text-[#39FF14] mr-3" />
+                          XRPB Token Setup
+                        </h3>
+                        
+                        {!hasTrustline ? (
+                          <div className="space-y-4">
+                            <p className="text-gray-300 mb-6">
+                              To receive and hold XRPB tokens on XRPL, you need to establish a trustline first.
+                            </p>
+                            
+                            <button
+                              onClick={handleSetupTrustline}
+                              disabled={isSettingUpTrustline}
+                              className="bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_40px_rgba(57,255,20,0.6)] transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mx-auto"
+                            >
+                              {isSettingUpTrustline ? (
+                                <>
+                                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                  Setting up Trustline...
+                                </>
+                              ) : (
+                                <>
+                                  <Zap className="w-5 h-5 mr-2" />
+                                  Setup XRPB Trustline
+                                </>
+                              )}
+                            </button>
+                            
+                            <div className="text-sm text-gray-400 space-y-2">
+                              <p>• This will open XAMAN app for you to sign the trustline transaction</p>
+                              <p>• Small network fee (~0.00001 XRP) required</p>
+                              <p>• One-time setup required to hold XRPB tokens</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center space-x-3 text-[#39FF14]">
+                            <CheckCircle className="w-6 h-6" />
+                            <span className="font-semibold">XRPB Trustline Active</span>
+                          </div>
+                        )}
+                        
+                        {/* Trustline Result Display */}
+                        {trustlineResult && (
+                          <div className={`mt-6 p-4 rounded-xl border ${
+                            trustlineResult.success 
+                              ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                              : 'bg-red-500/10 border-red-500/30 text-red-400'
+                          }`}>
+                            <div className="flex items-center justify-center space-x-2">
+                              {trustlineResult.success ? (
+                                <CheckCircle className="w-5 h-5" />
+                              ) : (
+                                <AlertCircle className="w-5 h-5" />
+                              )}
+                              <span className="font-medium">{trustlineResult.message}</span>
+                            </div>
+                            {trustlineResult.txHash && (
+                              <p className="text-sm mt-2 opacity-80">
+                                Transaction: {trustlineResult.txHash}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
                 <div className="text-center mb-8">
                   <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent flex items-center justify-center">
                     <TrendingUp className="w-8 h-8 text-[#39FF14] mr-3" />
@@ -1002,7 +1113,7 @@ export default function MembershipPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-300">Amount:</span>
                         <span className="text-[#39FF14] font-bold">
-                          {getPaymentAmount(selectedTier, paymentMethod.type)} {paymentMethod.currency}
+                          {getPaymentAmountForWallet(selectedTier, paymentMethod.type)} {paymentMethod.currency}
                         </span>
                       </div>
                       <div className="flex justify-between border-t border-gray-600 pt-3">

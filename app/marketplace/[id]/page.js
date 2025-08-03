@@ -7,7 +7,7 @@ import { useXRPL } from '../../context/XRPLContext'
 import { useMetamask } from '../../context/MetamaskContext'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { createEscrowPayment } from '../../constructs/payments/escrowPayment.js'
-import { getXRPBPriceInUSD, calculateXRPBAmount, sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment } from '../../constructs/payments/signAndPay'
+import { getXRPBPriceInUSD, calculateXRPBAmount, sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getAllXRPBPrices } from '../../constructs/payments/signAndPay'
 import { useAuth } from "@/app/context/AuthContext"
 
 export default function ProductDetailPage() {
@@ -37,6 +37,16 @@ export default function ProductDetailPage() {
   const [orderProcessing, setOrderProcessing] = useState(false)
   const [xrpbPrice, setXrpbPrice] = useState(3.10) // Fallback price
   const [isLoadingPrice, setIsLoadingPrice] = useState(false)
+  const [xrpbPrices, setXrpbPrices] = useState({
+    solana: 0,
+    xrpl: 0,
+    xrplEvm: 0
+  })
+  const [priceLoadingStates, setPriceLoadingStates] = useState({
+    solana: false,
+    xrpl: false,
+    xrplEvm: false
+  })
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const [calculatedAmount, setCalculatedAmount] = useState(0)
@@ -341,23 +351,46 @@ export default function ProductDetailPage() {
     return 'XRPB'
   }
 
-  // Function to fetch XRPB price with dynamic pricing
-  const fetchXRPBPrice = async () => {
+  // Function to fetch XRPB prices from all chains
+  const fetchAllXRPBPrices = async () => {
+    console.log('🔄 Fetching XRPB prices from all chains...');
+    
+    setPriceLoadingStates({
+      solana: true,
+      xrpl: true,
+      xrplEvm: true
+    });
     setIsLoadingPrice(true);
+    
     try {
-      const dynamicPrice = await getXRPBPriceInUSD();
-      if (dynamicPrice) {
-        setXrpbPrice(dynamicPrice);
-        console.log('✅ Dynamic XRPB price fetched:', dynamicPrice);
-      } else {
-        // Fallback price
-        setXrpbPrice(3.10);
-        console.warn('⚠️ Using fallback XRPB price: $3.10');
-      }
+      const prices = await getAllXRPBPrices();
+      
+      setXrpbPrices({
+        solana: prices.solana || 0.0001, // Fallback price
+        xrpl: prices.xrpl || 0.0001,
+        xrplEvm: prices.xrplEvm || 0.0001
+      });
+      
+      // Set main price to the first available price
+      const mainPrice = prices.solana || prices.xrpl || prices.xrplEvm || 3.10;
+      setXrpbPrice(mainPrice);
+      
+      console.log('✅ All XRPB prices fetched:', prices);
     } catch (error) {
-      console.error('Error fetching XRPB price:', error);
-      setXrpbPrice(3.10); // Fallback price
+      console.error('❌ Error fetching XRPB prices:', error);
+      // Set fallback prices
+      setXrpbPrices({
+        solana: 0.0001,
+        xrpl: 0.0001,
+        xrplEvm: 0.0001
+      });
+      setXrpbPrice(3.10);
     } finally {
+      setPriceLoadingStates({
+        solana: false,
+        xrpl: false,
+        xrplEvm: false
+      });
       setIsLoadingPrice(false);
     }
   };
@@ -377,25 +410,56 @@ export default function ProductDetailPage() {
       return calculateXRPBAmount(usdAmount, xrpbPrice);
     }
   };
+  
+  // Add function to get payment amount based on listing chain
+  const getPaymentAmountForListing = (priceUSD, listingChain) => {
+    if (!priceUSD || priceUSD === 0) return 0;
+    
+    let priceToUse;
+    switch (listingChain) {
+      case 'solana':
+        priceToUse = xrpbPrices.solana;
+        break;
+      case 'xrp':
+        priceToUse = xrpbPrices.xrpl;
+        break;
+      case 'evm':
+        priceToUse = xrpbPrices.xrplEvm;
+        break;
+      default:
+        // Fallback to the first available price
+        priceToUse = xrpbPrices.solana || xrpbPrices.xrpl || xrpbPrices.xrplEvm || xrpbPrice;
+    }
+    
+    // Use fallback if chain-specific price is not available
+    if (!priceToUse || priceToUse <= 0) {
+      priceToUse = xrpbPrice;
+    }
+    
+    return calculateXRPBAmount(priceUSD, priceToUse);
+  };
 
   // Function to get payment amount for a specific wallet type
   const getPaymentAmount = (priceUSD, walletType) => {
-    if (!priceUSD || priceUSD === 0) return 0
-    return calculateXRPBAmount(priceUSD, xrpbPrice)
+    if (!listing) return 0;
+    return getPaymentAmountForListing(priceUSD, listing.chain);
   }
 
   // Fetch XRPB price on component mount
   useEffect(() => {
-    fetchXRPBPrice()
+    fetchAllXRPBPrices()
+    // Set up interval to refresh prices every 30 seconds
+    const interval = setInterval(fetchAllXRPBPrices, 30000);
+    return () => clearInterval(interval);
   }, [])
 
-  // Update calculated amount when listing or XRPB price changes
+  // Update calculated amount when listing or XRPB prices change
   useEffect(() => {
     if (listing && listing.price) {
-      const amount = getPaymentAmount(parseFloat(listing.price), 'xrpb')
-      setCalculatedAmount(amount)
+      const amount = getPaymentAmountForListing(parseFloat(listing.price), listing.chain);
+      setCalculatedAmount(amount);
     }
-  }, [listing, xrpbPrice])
+  }, [listing, xrpbPrices])
 
   // Update connected wallets using the same method as membership page
   useEffect(() => {
@@ -1077,13 +1141,44 @@ export default function ProductDetailPage() {
                         {isLoadingPrice ? (
                           <Loader2 className="w-4 h-4 animate-spin inline ml-2" />
                         ) : (
-                          <span className="text-[#39FF14] ml-1">${xrpbPrice.toFixed(2)}</span>
+                          <span className="text-[#39FF14] ml-1">${xrpbPrice.toFixed(4)}</span>
                         )}
                       </span>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-400">≈ {calculatedAmount} XRPB</p>
                       <p className="text-xs text-gray-400">for ${listing?.price} USD</p>
+                    </div>
+                  </div>
+                  
+                  {/* Chain-specific prices */}
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                    <div className="flex items-center">
+                      <span className="text-blue-400 mr-1">🔷</span>
+                      <span className="text-gray-400">XRPL:</span>
+                      {priceLoadingStates.xrpl ? (
+                        <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                      ) : (
+                        <span className="text-[#39FF14] ml-1">${xrpbPrices.xrpl.toFixed(4)}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-purple-400 mr-1">🦊</span>
+                      <span className="text-gray-400">EVM:</span>
+                      {priceLoadingStates.xrplEvm ? (
+                        <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                      ) : (
+                        <span className="text-[#39FF14] ml-1">${xrpbPrices.xrplEvm.toFixed(4)}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-green-400 mr-1">☀️</span>
+                      <span className="text-gray-400">SOL:</span>
+                      {priceLoadingStates.solana ? (
+                        <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                      ) : (
+                        <span className="text-[#39FF14] ml-1">${xrpbPrices.solana.toFixed(4)}</span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -158,6 +158,101 @@ export const XRPLProvider = ({ children }) => {
     }
   }, []);
 
+  // Add this new function in the XRPLProvider component
+  const setupXRPBTrustline = async () => {
+    try {
+      if (!xrpWalletAddress) {
+        throw new Error('Please connect your XAMAN wallet first');
+      }
+
+      console.log('🔗 Setting up XRPB trustline...');
+      
+      // Create trustline payload for XUMM
+      const trustlinePayload = {
+        TransactionType: 'TrustSet',
+        Account: xrpWalletAddress,
+        LimitAmount: {
+          currency: XRPB_CURRENCY,
+          issuer: XRPB_ISSUER,
+          value: '1000000000' // Set a high limit (1 billion XRPB)
+        },
+        Flags: 131072 // tfSetNoRipple flag
+      };
+
+      // Submit to XUMM
+      const request = await xumm.payload.createAndSubscribe(trustlinePayload, (event) => {
+        console.log('Trustline event:', event);
+        if (event.data.signed === true) {
+          console.log('✅ Trustline transaction signed!');
+          return {
+            success: true,
+            message: 'XRPB trustline successfully established!',
+            txHash: event.data.txid
+          };
+        } else if (event.data.signed === false) {
+          console.log('❌ Trustline transaction rejected');
+          return {
+            success: false,
+            message: 'Trustline setup was cancelled or rejected'
+          };
+        }
+      });
+
+      // Open XUMM for user to sign
+      if (request.created.next && request.created.next.always) {
+        window.open(request.created.next.always, '_blank');
+      }
+
+      // Wait for the result
+      const result = await request.resolved;
+      
+      if (result.signed) {
+        console.log('✅ XRPB Trustline established successfully!');
+        
+        // Refresh XRPB balance after trustline is set
+        const newXrpbBalance = await getXrpbBalance(xrpWalletAddress);
+        setXrpbBalance(newXrpbBalance);
+        
+        return {
+          success: true,
+          message: 'XRPB trustline successfully established!',
+          txHash: result.txid
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Trustline setup was cancelled or rejected'
+        };
+      }
+    } catch (error) {
+      console.error('❌ Error setting up XRPB trustline:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to setup XRPB trustline'
+      };
+    }
+  };
+
+  // Add this function to check if trustline exists
+  const checkXRPBTrustline = async (address = xrpWalletAddress) => {
+    try {
+      if (!address) return false;
+      
+      const response = await fetch(`https://api.xrpscan.com/api/v1/account/${address}/balances`);
+      const data = await response.json();
+      
+      const xrpbTrustline = data.find(token => 
+        token.currency === XRPB_CURRENCY && token.issuer === XRPB_ISSUER
+      );
+      
+      return !!xrpbTrustline;
+    } catch (error) {
+      console.error('Error checking XRPB trustline:', error);
+      return false;
+    }
+  };
+
+  // Update the value object to include new functions
   const value = {
     xrpWalletAddress,
     xrplWallet,
@@ -169,6 +264,8 @@ export const XRPLProvider = ({ children }) => {
     setCurrentStep,
     getXrpBalance,
     getXrpbBalance,
+    setupXRPBTrustline,
+    checkXRPBTrustline,
   };
 
   return (
