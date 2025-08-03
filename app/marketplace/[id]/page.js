@@ -35,12 +35,12 @@ export default function ProductDetailPage() {
   const [showShippingForm, setShowShippingForm] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [orderProcessing, setOrderProcessing] = useState(false)
-  const [xrpbPrice, setXrpbPrice] = useState(3.10) // Fallback price
+  const [xrpbPrice, setXrpbPrice] = useState(null) // No fallback price
   const [isLoadingPrice, setIsLoadingPrice] = useState(false)
   const [xrpbPrices, setXrpbPrices] = useState({
-    solana: 0,
-    xrpl: 0,
-    xrplEvm: 0
+    solana: null,
+    xrpl: null,
+    xrplEvm: null
   })
   const [priceLoadingStates, setPriceLoadingStates] = useState({
     solana: false,
@@ -58,6 +58,88 @@ export default function ProductDetailPage() {
       router.push('/login?redirect=/marketplace')
     }
   }, [user, authLoading, router])
+
+  // Helper function to check if buy button should be shown
+  const shouldShowBuyButton = () => {
+    // Don't show if no wallets connected
+    if (connectedWallets.length === 0) {
+      return false;
+    }
+    
+    // Don't show if listing is sold
+    if (listing?.status === 'sold') {
+      return false;
+    }
+    
+    // Check if at least one connected wallet has a valid price
+    const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
+      const walletType = wallet.type === 'xrpl_evm' ? 'evm' : wallet.type;
+      let priceToCheck;
+      switch (walletType) {
+        case 'solana':
+          priceToCheck = xrpbPrices.solana;
+          break;
+        case 'xrp':
+          priceToCheck = xrpbPrices.xrpl;
+          break;
+        case 'evm':
+          priceToCheck = xrpbPrices.xrplEvm;
+          break;
+        default:
+          return false;
+      }
+      return priceToCheck && priceToCheck > 0.0001;
+    });
+    
+    if (!hasValidPriceForConnectedWallet) {
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Helper function to get error message when buy button is hidden
+  const getBuyButtonErrorMessage = () => {
+    if (listing?.status === 'sold') {
+      return 'This item is sold out';
+    }
+    
+    if (connectedWallets.length === 0) {
+      return 'Please connect a wallet to make a purchase';
+    }
+    
+    // Check if any prices are available at all
+    const hasAnyValidPrices = Object.values(xrpbPrices).some(price => price && price > 0.0001);
+    if (!hasAnyValidPrices) {
+      return 'Unable to fetch current XRPB prices. Please try again later.';
+    }
+    
+    // Check if connected wallets have valid prices
+    const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
+      const walletType = wallet.type === 'xrpl_evm' ? 'evm' : wallet.type;
+      let priceToCheck;
+      switch (walletType) {
+        case 'solana':
+          priceToCheck = xrpbPrices.solana;
+          break;
+        case 'xrp':
+          priceToCheck = xrpbPrices.xrpl;
+          break;
+        case 'evm':
+          priceToCheck = xrpbPrices.xrplEvm;
+          break;
+        default:
+          return false;
+      }
+      return priceToCheck && priceToCheck > 0.0001;
+    });
+    
+    if (!hasValidPriceForConnectedWallet) {
+      return 'XRPB prices not available for your connected wallets. Please try connecting a different wallet or try again later.';
+    }
+    
+    return 'Unable to process purchase at this time. Please try again later.';
+  };
 
   // Update connected wallets using the same method as membership page
   useEffect(() => {
@@ -190,11 +272,18 @@ export default function ProductDetailPage() {
     setOrderProcessing(true)
     
     try {
-      // Calculate dynamic XRPB amount
-      const xrpbAmount = await calculateXRPBAmountDynamic(parseFloat(listing.price))
-      
       const primaryWallet = selectedPaymentMethod
       const chainType = primaryWallet.type === 'xrpl_evm' ? 'evm' : primaryWallet.type
+      
+      // Calculate XRPB amount based on connected wallet's chain
+      let xrpbAmount;
+      try {
+        xrpbAmount = getPaymentAmountForWallet(parseFloat(listing.price), chainType);
+      } catch (error) {
+        alert(`❌ ${error.message}`);
+        setOrderProcessing(false);
+        return;
+      }
       
       let walletForPayment
       if (chainType === 'xrp') {
@@ -281,16 +370,16 @@ export default function ProductDetailPage() {
       console.log('✅ Escrow created successfully:', escrowData.escrowId)
 
       // Create order record
-      const orderData = {
-        listing_id: listing.id,
-        amount: xrpbAmount, // Use calculated XRPB amount
-        order_type: 'purchase',
-        wallet_address: primaryWallet.address,
-        buyer_id: user.id, // Add buyer_id from authenticated user
-        escrow_id: escrowData.escrowId,
-        transaction_hash: paymentResult.signature || paymentResult.txHash,
-        payment_chain: mappedChain
-      }
+              const orderData = {
+                listing_id: listing.id,
+                amount: xrpbAmount, // Use calculated XRPB amount
+                order_type: 'purchase',
+                wallet_address: primaryWallet.address,
+                buyer_id: user.id, // Add buyer_id from authenticated user
+                escrow_id: escrowData.escrowId,
+                transaction_hash: paymentResult.signature || paymentResult.txHash,
+                payment_chain: mappedChain // ✅ Payment chain is stored here
+              }
       
       if (listing.is_physical) {
         orderData.shipping_info = shippingInfo
@@ -366,25 +455,25 @@ export default function ProductDetailPage() {
       const prices = await getAllXRPBPrices();
       
       setXrpbPrices({
-        solana: prices.solana || 0.0001, // Fallback price
-        xrpl: prices.xrpl || 0.0001,
-        xrplEvm: prices.xrplEvm || 0.0001
+        solana: prices.solana || null, // No fallback - null if failed
+        xrpl: prices.xrpl || null,
+        xrplEvm: prices.xrplEvm || null
       });
       
-      // Set main price to the first available price
-      const mainPrice = prices.solana || prices.xrpl || prices.xrplEvm || 3.10;
+      // Set main price to the first available price, or null if none available
+      const mainPrice = prices.solana || prices.xrpl || prices.xrplEvm || null;
       setXrpbPrice(mainPrice);
       
       console.log('✅ All XRPB prices fetched:', prices);
     } catch (error) {
       console.error('❌ Error fetching XRPB prices:', error);
-      // Set fallback prices
+      // No fallback prices - set all to null
       setXrpbPrices({
-        solana: 0.0001,
-        xrpl: 0.0001,
-        xrplEvm: 0.0001
+        solana: null,
+        xrpl: null,
+        xrplEvm: null
       });
-      setXrpbPrice(3.10);
+      setXrpbPrice(null);
     } finally {
       setPriceLoadingStates({
         solana: false,
@@ -395,45 +484,29 @@ export default function ProductDetailPage() {
     }
   };
 
-  // Function to calculate XRPB amount from USD using dynamic pricing
-  const calculateXRPBAmountDynamic = async (usdAmount) => {
-    try {
-      const currentPrice = await getXRPBPriceInUSD();
-      if (currentPrice) {
-        setXrpbPrice(currentPrice);
-        return calculateXRPBAmount(usdAmount, currentPrice);
-      } else {
-        return calculateXRPBAmount(usdAmount, xrpbPrice);
-      }
-    } catch (error) {
-      console.error('Error calculating dynamic XRPB amount:', error);
-      return calculateXRPBAmount(usdAmount, xrpbPrice);
-    }
-  };
-  
-  // Add function to get payment amount based on listing chain
-  const getPaymentAmountForListing = (priceUSD, listingChain) => {
+  // Function to get payment amount based on connected wallet chain
+  const getPaymentAmountForWallet = (priceUSD, walletType) => {
     if (!priceUSD || priceUSD === 0) return 0;
     
     let priceToUse;
-    switch (listingChain) {
+    switch (walletType) {
       case 'solana':
         priceToUse = xrpbPrices.solana;
         break;
       case 'xrp':
         priceToUse = xrpbPrices.xrpl;
         break;
+      case 'xrpl_evm':
       case 'evm':
         priceToUse = xrpbPrices.xrplEvm;
         break;
       default:
-        // Fallback to the first available price
-        priceToUse = xrpbPrices.solana || xrpbPrices.xrpl || xrpbPrices.xrplEvm || xrpbPrice;
+        throw new Error(`Unsupported wallet type: ${walletType}`);
     }
     
-    // Use fallback if chain-specific price is not available
+    // If price is not available for this chain, throw error
     if (!priceToUse || priceToUse <= 0) {
-      priceToUse = xrpbPrice;
+      throw new Error(`XRPB price not available for ${walletType} chain. Please try again later.`);
     }
     
     return calculateXRPBAmount(priceUSD, priceToUse);
@@ -441,8 +514,11 @@ export default function ProductDetailPage() {
 
   // Function to get payment amount for a specific wallet type
   const getPaymentAmount = (priceUSD, walletType) => {
-    if (!listing) return 0;
-    return getPaymentAmountForListing(priceUSD, listing.chain);
+    try {
+      return getPaymentAmountForWallet(priceUSD, walletType);
+    } catch (error) {
+      return 0; // Return 0 if price not available for display purposes
+    }
   }
 
   // Fetch XRPB price on component mount
@@ -456,10 +532,33 @@ export default function ProductDetailPage() {
   // Update calculated amount when listing or XRPB prices change
   useEffect(() => {
     if (listing && listing.price) {
-      const amount = getPaymentAmountForListing(parseFloat(listing.price), listing.chain);
-      setCalculatedAmount(amount);
+      // If a payment method is selected, use that
+      if (selectedPaymentMethod) {
+        try {
+          const chainType = selectedPaymentMethod.type === 'xrpl_evm' ? 'evm' : selectedPaymentMethod.type;
+          const amount = getPaymentAmountForWallet(parseFloat(listing.price), chainType);
+          setCalculatedAmount(amount);
+        } catch (error) {
+          setCalculatedAmount(0); // Set to 0 if price not available
+        }
+      } 
+      // If no payment method selected but wallets are connected, use the first connected wallet
+      else if (connectedWallets.length > 0) {
+        try {
+          const primaryWallet = connectedWallets[0];
+          const chainType = primaryWallet.type === 'xrpl_evm' ? 'evm' : primaryWallet.type;
+          const amount = getPaymentAmountForWallet(parseFloat(listing.price), chainType);
+          setCalculatedAmount(amount);
+        } catch (error) {
+          setCalculatedAmount(0); // Set to 0 if price not available
+        }
+      } else {
+        setCalculatedAmount(0);
+      }
+    } else {
+      setCalculatedAmount(0);
     }
-  }, [listing, xrpbPrices])
+  }, [listing, xrpbPrices, selectedPaymentMethod, connectedWallets])
 
   // Update connected wallets using the same method as membership page
   useEffect(() => {
@@ -802,7 +901,7 @@ export default function ProductDetailPage() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <p className="text-gray-400 text-sm">Current Price</p>
-                  <p className="text-3xl font-bold text-[#39FF14]">{parseFloat(listing.price)} XRPB {getChainIcon(listing.chain)}</p>
+                  <p className="text-3xl font-bold text-[#39FF14]">{parseFloat(listing.price)} USD {getChainIcon(listing.chain)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-gray-400 text-sm">Seller</p>
@@ -868,21 +967,39 @@ export default function ProductDetailPage() {
               {/* Bid Section - Updated for XRPB */}
               {/* Remove bidAmount and handleBid function */}
 
-              <div className="grid grid-cols-1 gap-4">
-                <button
-                  onClick={handleBuyNow}
-                  disabled={connectedWallets.length === 0 || orderProcessing || listing.status === 'sold'}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                    connectedWallets.length === 0 || orderProcessing || listing.status === 'sold'
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-[#39FF14] text-black hover:bg-[#39FF14]/90'
-                  }`}
-                >
-                  {orderProcessing ? 'Processing...' : 
-                   listing.status === 'sold' ? 'Sold Out' :
-                   `Buy Now for $${listing?.price} USD (≈${calculatedAmount} XRPB)`}
-                </button>
-              </div>
+              {shouldShowBuyButton() && (
+                <div className="grid grid-cols-1 gap-4">
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={orderProcessing}
+                    className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                      orderProcessing
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#39FF14] text-black hover:bg-[#39FF14]/90'
+                    }`}
+                  >
+                    {orderProcessing ? 'Processing...' : 
+                     `Buy Now for $${listing?.price} USD (≈${calculatedAmount} XRPB)`}
+                  </button>
+                </div>
+              )}
+
+              {/* Show message when buy button is hidden */}
+              {!shouldShowBuyButton() && connectedWallets.length === 0 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                  <p className="text-yellow-400 text-sm text-center">
+                    Connect a wallet to see purchase options
+                  </p>
+                </div>
+              )}
+
+              {!shouldShowBuyButton() && connectedWallets.length > 0 && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                  <p className="text-red-400 text-sm text-center">
+                    {getBuyButtonErrorMessage()}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* ... existing code for stats and bid history ... */}
@@ -1032,7 +1149,7 @@ export default function ProductDetailPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">XRPB Price:</span>
-                    <span className="text-[#39FF14]">${xrpbPrice.toFixed(2)}</span>
+                    <span className="text-[#39FF14]">${xrpbPrice?.toFixed(9) || "N/A"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">Payment Method:</span>
@@ -1141,7 +1258,7 @@ export default function ProductDetailPage() {
                         {isLoadingPrice ? (
                           <Loader2 className="w-4 h-4 animate-spin inline ml-2" />
                         ) : (
-                          <span className="text-[#39FF14] ml-1">${xrpbPrice.toFixed(4)}</span>
+                          <span className="text-[#39FF14] ml-1">${xrpbPrice.toFixed(9)}</span>
                         )}
                       </span>
                     </div>
@@ -1159,7 +1276,7 @@ export default function ProductDetailPage() {
                       {priceLoadingStates.xrpl ? (
                         <Loader2 className="w-3 h-3 animate-spin ml-1" />
                       ) : (
-                        <span className="text-[#39FF14] ml-1">${xrpbPrices.xrpl.toFixed(4)}</span>
+                        <span className="text-[#39FF14] ml-1">${xrpbPrices.xrpl.toFixed(9)}</span>
                       )}
                     </div>
                     <div className="flex items-center">
@@ -1168,7 +1285,7 @@ export default function ProductDetailPage() {
                       {priceLoadingStates.xrplEvm ? (
                         <Loader2 className="w-3 h-3 animate-spin ml-1" />
                       ) : (
-                        <span className="text-[#39FF14] ml-1">${xrpbPrices.xrplEvm.toFixed(4)}</span>
+                        <span className="text-[#39FF14] ml-1">${xrpbPrices.xrplEvm.toFixed(9)}</span>
                       )}
                     </div>
                     <div className="flex items-center">
@@ -1177,7 +1294,7 @@ export default function ProductDetailPage() {
                       {priceLoadingStates.solana ? (
                         <Loader2 className="w-3 h-3 animate-spin ml-1" />
                       ) : (
-                        <span className="text-[#39FF14] ml-1">${xrpbPrices.solana.toFixed(4)}</span>
+                        <span className="text-[#39FF14] ml-1">${xrpbPrices.solana.toFixed(9)}</span>
                       )}
                     </div>
                   </div>
@@ -1186,21 +1303,41 @@ export default function ProductDetailPage() {
 
               {/* ... existing code ... */}
 
-              <div className="grid grid-cols-1 gap-4">
-                <button
-                  onClick={handleBuyNow}
-                  disabled={connectedWallets.length === 0 || orderProcessing || listing.status === 'sold'}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                    connectedWallets.length === 0 || orderProcessing || listing.status === 'sold'
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-[#39FF14] text-black hover:bg-[#39FF14]/90'
-                  }`}
-                >
-                  {orderProcessing ? 'Processing...' : 
-                   listing.status === 'sold' ? 'Sold Out' :
-                   `Buy Now for $${listing?.price} USD (≈${calculatedAmount} XRPB)`}
-                </button>
-              </div>
+              {shouldShowBuyButton() && (
+                <div className="grid grid-cols-1 gap-4">
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={orderProcessing}
+                    className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                      orderProcessing
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-[#39FF14] text-black hover:bg-[#39FF14]/90'
+                    }`}
+                  >
+                    {orderProcessing ? 'Processing...' : 
+                     `Buy Now for $${listing?.price} USD (≈${calculatedAmount} XRPB)`}
+                  </button>
+                </div>
+              )}
+
+              {/* Show message when buy button is hidden */}
+              {!shouldShowBuyButton() && connectedWallets.length === 0 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                  <p className="text-yellow-400 text-sm text-center">
+                    Connect a wallet to see purchase options
+                  </p>
+                </div>
+              )}
+
+              {!shouldShowBuyButton() && connectedWallets.length > 0 && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                  <p className="text-red-400 text-sm text-center">
+                    {listing?.status === 'sold' 
+                      ? 'This item is sold out'
+                      : 'Unable to fetch current XRPB prices. Please try again later.'}
+                  </p>
+                </div>
+              )}
 
       {/* Updated Payment Confirmation Modal */}
       {showPaymentModal && (

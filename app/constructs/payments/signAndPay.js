@@ -291,10 +291,10 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
  */
 export const sendXRPLXRPBPayment = async (wallet, amount) => {
   try {
-    if (!wallet || !wallet.account) {
-      alert("This is the issue")
-      throw new Error('XRPL Wallet not connected');
-    }
+    // if (!wallet || !wallet.account) {
+    //   alert("This is the issue")
+    //   throw new Error('XRPL Wallet not connected');
+    // }
 
     console.log('🔵 XRPL XRPB PAYMENT INITIATED (MAINNET)');
     console.log('From:', wallet.account);
@@ -874,9 +874,7 @@ export const getXRPBPriceFromSolana = async () => {
     if (response.ok) {
       const data = await response.json();
       
-      // Check if we have pairs data
       if (data.pairs && Array.isArray(data.pairs) && data.pairs.length > 0) {
-        // Get the first pair (usually the most liquid one)
         const pair = data.pairs[0];
         
         if (pair.priceUsd) {
