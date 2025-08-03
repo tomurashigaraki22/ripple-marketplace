@@ -6,9 +6,11 @@ import Image from "next/image"
 import { useXRPL } from "../../context/XRPLContext"
 import { useMetamask } from "../../context/MetamaskContext"
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
+import { useAuth } from "@/app/context/AuthContext"
 
 export default function MyOrdersPage() {
   const [orders, setOrders] = useState([])
+    const { token, user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [pagination, setPagination] = useState({ page: 1, totalPages: 0, total: 0 })
@@ -60,8 +62,8 @@ export default function MyOrdersPage() {
     }
   }, [connectedWallets, selectedStatus, pagination.page])
 
-  const fetchOrders = async () => {
-    if (connectedWallets.length === 0) {
+const fetchOrders = async () => {
+    if (!token || !user) {
       setLoading(false)
       return
     }
@@ -69,7 +71,6 @@ export default function MyOrdersPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams({
-        wallet: connectedWallets[0].address,
         page: pagination.page.toString(),
         limit: '10'
       })
@@ -78,8 +79,16 @@ export default function MyOrdersPage() {
         params.append('status', selectedStatus)
       }
 
-      const response = await fetch(`/api/orders?${params}`)
-      if (!response.ok) throw new Error('Failed to fetch orders')
+      const response = await fetch(`/api/orders?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders')
+      }
       
       const data = await response.json()
       setOrders(data.orders)
@@ -92,36 +101,47 @@ export default function MyOrdersPage() {
   }
 
   const handleMarkDelivered = async (orderId) => {
-  try {
-    setConfirmingOrder(orderId)
-    
-    // Get buyer_id from connected wallet or user context
-    const response = await fetch(`/api/orders/${orderId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        status: 'delivered',
-        buyer_id: connectedWallets[0]?.address // or get from user context
-      })
-    })
-
-    if (response.ok) {
-      // Refresh orders
-      fetchOrders()
-      alert('Order marked as delivered successfully!')
-    } else {
-      const error = await response.json()
-      alert(`Error: ${error.message}`)
+    if (!token) {
+      alert('Please log in to perform this action')
+      return
     }
-  } catch (error) {
-    console.error('Error marking order as delivered:', error)
-    alert('Failed to mark order as delivered')
-  } finally {
-    setConfirmingOrder(null)
+
+    try {
+      setConfirmingOrder(orderId)
+      
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          status: 'delivered'
+        })
+      })
+
+      if (response.ok) {
+        fetchOrders()
+        alert('Order marked as delivered successfully!')
+      } else {
+        const error = await response.json()
+        alert(`Error: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error marking order as delivered:', error)
+      alert('Failed to mark order as delivered')
+    } finally {
+      setConfirmingOrder(null)
+    }
   }
-}
+
+  // ... existing code ...
+
+  useEffect(() => {
+    if (token && user) {
+      fetchOrders()
+    }
+  }, [token, user, selectedStatus, pagination.page])
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -189,6 +209,26 @@ export default function MyOrdersPage() {
               className="inline-flex items-center px-6 py-3 bg-[#39FF14] text-black font-semibold rounded-xl hover:bg-[#39FF14]/90 transition-colors duration-300"
             >
               Connect Wallet
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!token || !user) {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center">
+            <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold mb-4">My Orders</h1>
+            <p className="text-gray-400 mb-8">Please log in to view your orders</p>
+            <Link
+              href="/login"
+              className="inline-flex items-center px-6 py-3 bg-[#39FF14] text-black font-semibold rounded-xl hover:bg-[#39FF14]/90 transition-colors duration-300"
+            >
+              Log In
             </Link>
           </div>
         </div>

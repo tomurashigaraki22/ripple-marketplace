@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '../../lib/db.js'
 import { v4 as uuidv4 } from 'uuid'
+import { verifyUserAccess } from '../../utils/auth.js'
 
 // POST - Create a new order (purchase) - Fixed schema compatibility
 export async function POST(request) {
@@ -73,8 +74,17 @@ export async function POST(request) {
 // GET - Fetch orders for a user
 export async function GET(request) {
   try {
+    // Verify user authentication and get user ID from token
+    const authResult = await verifyUserAccess(request);
+    if (!authResult.success) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      );
+    }
+
+    const userId = authResult.user.id;
     const url = new URL(request.url)
-    const walletAddress = url.searchParams.get('wallet')
     const status = url.searchParams.get('status')
     const page = parseInt(url.searchParams.get('page')) || 1
     const limit = parseInt(url.searchParams.get('limit')) || 10
@@ -90,42 +100,14 @@ export async function GET(request) {
       FROM orders o
       JOIN listings l ON o.listing_id = l.id
       JOIN users seller ON o.seller_id = seller.id
+      WHERE o.buyer_id = ?
     `
     
-    const queryParams = []
-    const conditions = []
-
-    if (walletAddress) {
-      // Find user by wallet address
-      const [walletUsers] = await db.query(
-        'SELECT user_id FROM wallet_addresses WHERE address = ?',
-        [walletAddress]
-      )
-      
-      if (walletUsers.length > 0) {
-        conditions.push('o.buyer_id = ?')
-        queryParams.push(walletUsers[0].user_id)
-      } else {
-        // No orders for this wallet
-        return NextResponse.json({
-          orders: [],
-          pagination: {
-            page,
-            limit,
-            total: 0,
-            totalPages: 0
-          }
-        })
-      }
-    }
+    const queryParams = [userId]
 
     if (status) {
-      conditions.push('o.status = ?')
+      query += ' AND o.status = ?'
       queryParams.push(status)
-    }
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ')
     }
 
     query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?'
@@ -134,26 +116,11 @@ export async function GET(request) {
     const [orders] = await db.query(query, queryParams)
 
     // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) as total FROM orders o'
-    const countParams = []
+    let countQuery = 'SELECT COUNT(*) as total FROM orders o WHERE o.buyer_id = ?'
+    const countParams = [userId]
     
-    if (walletAddress) {
-      const [walletUsers] = await db.query(
-        'SELECT user_id FROM wallet_addresses WHERE address = ?',
-        [walletAddress]
-      )
-      
-      if (walletUsers.length > 0) {
-        countQuery += ' WHERE o.buyer_id = ?'
-        countParams.push(walletUsers[0].user_id)
-      }
-    }
-    
-    if (status && countParams.length > 0) {
+    if (status) {
       countQuery += ' AND o.status = ?'
-      countParams.push(status)
-    } else if (status) {
-      countQuery += ' WHERE o.status = ?'
       countParams.push(status)
     }
 
