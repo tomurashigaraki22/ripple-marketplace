@@ -869,26 +869,31 @@ export const getXRPBPriceFromGeckoTerminal = async () => {
  */
 export const getXRPBPriceFromSolana = async () => {
   try {
-    const response = await fetch('https://dropserver.shop/api/price/solana');
+    const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/FJLz7hP4EXVMVnRBtP77V4k55t2BfXuajKQp1gcwpump');
     
     if (response.ok) {
       const data = await response.json();
       
-      if (data.success && data.price) {
-        // Extract numeric value from price string (e.g., "$0.00009158" -> 0.00009158)
-        const priceValue = parseFloat(data.price.replace('$', ''));
+      // Check if we have pairs data
+      if (data.pairs && Array.isArray(data.pairs) && data.pairs.length > 0) {
+        // Get the first pair (usually the most liquid one)
+        const pair = data.pairs[0];
         
-        if (priceValue && priceValue > 0) {
-          console.log('✅ XRPB price from Solana API:', priceValue);
-          return priceValue;
+        if (pair.priceUsd) {
+          const priceValue = parseFloat(pair.priceUsd);
+          
+          if (priceValue && priceValue > 0) {
+            console.log('✅ XRPB price from DexScreener (Solana):', priceValue);
+            return priceValue;
+          }
         }
       }
     }
     
-    console.warn('⚠️ Could not fetch XRPB price from Solana API');
+    console.warn('⚠️ Could not fetch XRPB price from DexScreener API');
     return null;
   } catch (error) {
-    console.error('❌ Error fetching XRPB price from Solana API:', error);
+    console.error('❌ Error fetching XRPB price from DexScreener API:', error);
     return null;
   }
 };
@@ -939,49 +944,13 @@ export const getXRPBPriceFromXRPLEVM = async () => {
 };
 
 /**
- * Get all XRPB prices from different chains using ONLY the new API
+ * Get all XRPB prices from different chains using individual API calls only
  */
 export const getAllXRPBPrices = async () => {
   try {
-    console.log('🔄 Fetching XRPB prices from all chains using new API only...');
+    console.log('🔄 Fetching XRPB prices from all chains using individual API calls...');
     
-    // Try to get both prices from the combined endpoint first
-    try {
-      const bothResponse = await fetch('https://dropserver.shop/api/price/both');
-      
-      if (bothResponse.ok) {
-        const bothData = await bothResponse.json();
-        
-        let solanaPrice = null;
-        let xrplPrice = null;
-        
-        // Extract Solana price
-        if (bothData.solana && bothData.solana.success && bothData.solana.price) {
-          solanaPrice = parseFloat(bothData.solana.price.replace('$', ''));
-        }
-        
-        // Extract XRPL price (keep as XRP value, no USD conversion)
-        if (bothData.xrpl && bothData.xrpl.success && bothData.xrpl.price) {
-          xrplPrice = parseFloat(bothData.xrpl.price.replace(' XRP', ''));
-        }
-        
-        // Get XRPL EVM price (simple fallback since not in API)
-        const xrplEvmPrice = 0.0001;
-        
-        const results = {
-          solana: solanaPrice,
-          xrpl: xrplPrice,
-          xrplEvm: xrplEvmPrice
-        };
-        
-        console.log('✅ All XRPB prices fetched from new API (no CoinGecko):', results);
-        return results;
-      }
-    } catch (bothError) {
-      console.warn('⚠️ Combined API endpoint failed, trying individual endpoints:', bothError);
-    }
-    
-    // Fallback to individual API calls (no CoinGecko)
+    // Use individual API calls only (no combined endpoint)
     const [solanaPrice, xrplPrice, xrplEvmPrice] = await Promise.allSettled([
       getXRPBPriceFromSolana(),
       getXRPBPriceFromXRPL(),
@@ -994,7 +963,7 @@ export const getAllXRPBPrices = async () => {
       xrplEvm: xrplEvmPrice.status === 'fulfilled' ? xrplEvmPrice.value : null
     };
     
-    console.log('✅ All XRPB prices fetched (individual calls, no CoinGecko):', results);
+    console.log('✅ All XRPB prices fetched (individual calls only):', results);
     return results;
   } catch (error) {
     console.error('❌ Error fetching all XRPB prices:', error);
