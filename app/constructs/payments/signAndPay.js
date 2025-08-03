@@ -777,3 +777,231 @@ export const getXRPBPriceInUSDEnhanced = async () => {
   console.warn('⚠️ All price sources failed, using fallback');
   return 3.10; // Fallback price
 };
+
+
+
+/**
+ * Get XRPB price with multiple fallback sources
+ * @returns {Promise<number>} XRPB price in USD
+ */
+export const getXRPBPriceMultiSource = async () => {
+  const sources = [
+    // Source 1: GeckoTerminal + XRPL (most accurate)
+    async () => {
+      return await getXRPBPriceFromGeckoTerminal();
+    },
+    
+    // Source 2: XRPL EVM DEX pair (existing method)
+    async () => {
+      const provider = new ethers.JsonRpcProvider(RPC_URL);
+      const pair = new ethers.Contract(PAIR_ADDRESS, PAIR_ABI, provider);
+      
+      const token0 = await pair.token0();
+      const token1 = await pair.token1();
+      const [reserve0, reserve1] = await pair.getReserves();
+      
+      let reserveXRPB, reserveXRP;
+      if (token0.toLowerCase() === XRPB_ADDRESS.toLowerCase()) {
+        reserveXRPB = reserve0;
+        reserveXRP = reserve1;
+      } else {
+        reserveXRPB = reserve1;
+        reserveXRP = reserve0;
+      }
+      
+      const priceInXRP = Number(reserveXRP) / Number(reserveXRPB);
+      
+      const xrpResponse = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd"
+      );
+      const xrpData = await xrpResponse.json();
+      
+      return priceInXRP * xrpData.ripple.usd;
+    }
+  ];
+  
+  for (let i = 0; i < sources.length; i++) {
+    try {
+      console.log(`🔄 Trying XRPB price source ${i + 1}...`);
+      const price = await sources[i]();
+      if (price && price > 0) {
+        console.log(`✅ XRPB price fetched from source ${i + 1}: $${price.toFixed(8)}`);
+        return price;
+      }
+    } catch (error) {
+      console.warn(`⚠️ XRPB price source ${i + 1} failed:`, error.message);
+    }
+  }
+  
+  console.warn('⚠️ All XRPB price sources failed, using fallback');
+  return 0.0001; // Conservative fallback based on your data
+};
+
+/**
+ * Get XRPB price from GeckoTerminal (GeckoTerminal)
+ */
+export const getXRPBPriceFromGeckoTerminal = async () => {
+  try {
+    const response = await fetch(
+      'https://api.geckoterminal.com/api/v2/networks/solana/tokens/FJLz7hP4EXVMVnRBtP77V4k55t2BfXuajKQp1gcwpump'
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      const price = parseFloat(data.data.attributes.price_usd);
+      
+      if (price && price > 0) {
+        console.log('✅ XRPB price from GeckoTerminal (full precision):', price);
+        return price; // Return the exact value without rounding
+      }
+    }
+    
+    console.warn('⚠️ Could not fetch XRPB price from GeckoTerminal');
+    return null;
+  } catch (error) {
+    console.error('❌ Error fetching XRPB price from GeckoTerminal:', error);
+    return null;
+  }
+};
+
+/**
+ * Get XRPB price from Solana using the new API
+ */
+export const getXRPBPriceFromSolana = async () => {
+  try {
+    const response = await fetch('http://148.113.201.195:1256/api/price/solana');
+    
+    if (response.ok) {
+      const data = await response.json();
+      
+      if (data.success && data.price) {
+        // Extract numeric value from price string (e.g., "$0.00009158" -> 0.00009158)
+        const priceValue = parseFloat(data.price.replace('$', ''));
+        
+        if (priceValue && priceValue > 0) {
+          console.log('✅ XRPB price from Solana API:', priceValue);
+          return priceValue;
+        }
+      }
+    }
+    
+    console.warn('⚠️ Could not fetch XRPB price from Solana API');
+    return null;
+  } catch (error) {
+    console.error('❌ Error fetching XRPB price from Solana API:', error);
+    return null;
+  }
+};
+
+/**
+ * Get XRPB price from XRPL using the new API (returns price in XRP, not USD)
+ */
+export const getXRPBPriceFromXRPL = async () => {
+  try {
+    const response = await fetch('http://148.113.201.195:1256/api/price/xrpl');
+    
+    if (response.ok) {
+      const data = await response.json();
+      
+      if (data.success && data.price) {
+        // Extract numeric value from XRP price string (e.g., "0.000241 XRP" -> 0.000241)
+        const xrpPriceValue = parseFloat(data.price.replace(' XRP', ''));
+        
+        if (xrpPriceValue && xrpPriceValue > 0) {
+          console.log('✅ XRPB price from XRPL API (in XRP):', xrpPriceValue);
+          // Return the XRP price directly - no USD conversion
+          return xrpPriceValue;
+        }
+      }
+    }
+    
+    console.warn('⚠️ Could not fetch XRPB price from XRPL API');
+    return null;
+  } catch (error) {
+    console.error('❌ Error fetching XRPB price from XRPL API:', error);
+    return null;
+  }
+};
+
+/**
+ * Get XRPB price from XRPL EVM - simplified without CoinGecko
+ */
+export const getXRPBPriceFromXRPLEVM = async () => {
+  try {
+    // Since your API doesn't provide XRPL EVM prices, we'll use a simple fallback
+    // You can replace this with your own XRPL EVM price source if available
+    console.log('⚠️ XRPL EVM price not available from new API, using fallback');
+    return 0.0001; // Simple fallback value
+  } catch (error) {
+    console.error('❌ Error fetching XRPB price from XRPL EVM:', error);
+    return null;
+  }
+};
+
+/**
+ * Get all XRPB prices from different chains using ONLY the new API
+ */
+export const getAllXRPBPrices = async () => {
+  try {
+    console.log('🔄 Fetching XRPB prices from all chains using new API only...');
+    
+    // Try to get both prices from the combined endpoint first
+    try {
+      const bothResponse = await fetch('http://148.113.201.195:1256/api/price/both');
+      
+      if (bothResponse.ok) {
+        const bothData = await bothResponse.json();
+        
+        let solanaPrice = null;
+        let xrplPrice = null;
+        
+        // Extract Solana price
+        if (bothData.solana && bothData.solana.success && bothData.solana.price) {
+          solanaPrice = parseFloat(bothData.solana.price.replace('$', ''));
+        }
+        
+        // Extract XRPL price (keep as XRP value, no USD conversion)
+        if (bothData.xrpl && bothData.xrpl.success && bothData.xrpl.price) {
+          xrplPrice = parseFloat(bothData.xrpl.price.replace(' XRP', ''));
+        }
+        
+        // Get XRPL EVM price (simple fallback since not in API)
+        const xrplEvmPrice = 0.0001;
+        
+        const results = {
+          solana: solanaPrice,
+          xrpl: xrplPrice,
+          xrplEvm: xrplEvmPrice
+        };
+        
+        console.log('✅ All XRPB prices fetched from new API (no CoinGecko):', results);
+        return results;
+      }
+    } catch (bothError) {
+      console.warn('⚠️ Combined API endpoint failed, trying individual endpoints:', bothError);
+    }
+    
+    // Fallback to individual API calls (no CoinGecko)
+    const [solanaPrice, xrplPrice, xrplEvmPrice] = await Promise.allSettled([
+      getXRPBPriceFromSolana(),
+      getXRPBPriceFromXRPL(),
+      getXRPBPriceFromXRPLEVM()
+    ]);
+    
+    const results = {
+      solana: solanaPrice.status === 'fulfilled' ? solanaPrice.value : null,
+      xrpl: xrplPrice.status === 'fulfilled' ? xrplPrice.value : null,
+      xrplEvm: xrplEvmPrice.status === 'fulfilled' ? xrplEvmPrice.value : null
+    };
+    
+    console.log('✅ All XRPB prices fetched (individual calls, no CoinGecko):', results);
+    return results;
+  } catch (error) {
+    console.error('❌ Error fetching all XRPB prices:', error);
+    return {
+      solana: null,
+      xrpl: null,
+      xrplEvm: null
+    };
+  }
+};

@@ -2,17 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import Link from "next/link"
-import { Check, Star, Crown, Zap, Sparkles, ArrowRight, Wallet, X, AlertCircle, CheckCircle, Loader2, CreditCard, DollarSign, Store, ShoppingBag } from "lucide-react"
+import { Check, Star, Crown, Zap, Sparkles, ArrowRight, Wallet, X, AlertCircle, CheckCircle, Loader2, CreditCard, DollarSign, Store, ShoppingBag, TrendingUp, BarChart3 } from "lucide-react"
 import { useXRPL } from '../context/XRPLContext'
 import { useMetamask } from '../context/MetamaskContext'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
-import { sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getXRPBPriceInUSD, calculateXRPBAmount } from '../constructs/payments/signAndPay'
+import { sendSolanaXRPBPayment, sendXRPLXRPBPayment, sendXRPLEvmXRPBPayment, getXRPBPriceInUSD, calculateXRPBAmount, getAllXRPBPrices, getXRPBPriceFromSolana, getXRPBPriceFromXRPL, getXRPBPriceFromXRPLEVM } from '../constructs/payments/signAndPay'
 import { ethers } from 'ethers'
 import { Clock } from 'lucide-react'; // or your preferred icon library
 import { useAuth } from '../context/AuthContext'
 import { useRouter } from 'next/navigation'
-  import { getXRPBPriceInUSDEnhanced } from '../constructs/payments/signAndPay';
-
+import { getXRPBPriceInUSDEnhanced, getXRPBPriceFromGeckoTerminal } from '../constructs/payments/signAndPay';
 
 export default function MembershipPage() {
   // Wallet contexts
@@ -20,13 +19,97 @@ export default function MembershipPage() {
   const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner, switchToXRPLEVM } = useMetamask()
   const { publicKey, connected: solanaConnected, wallet, sendTransaction, signTransaction, signAllTransactions } = useWallet()
   const { connection } = useConnection()
+  const [xrpbPrices, setXrpbPrices] = useState({
+    solana: null,      // GeckoTerminal Solana price
+    xrpl: null,        // XRPL order book price
+    xrplEvm: null      // XRPL EVM DEX price
+  })
+  const [priceLoadingStates, setPriceLoadingStates] = useState({
+    solana: false,
+    xrpl: false,
+    xrplEvm: false
+  })
   const router = useRouter()
+
+  const fetchAllXRPBPrices = async () => {
+    console.log('🔄 Fetching XRPB prices from all chains...');
+    
+    setPriceLoadingStates({
+      solana: true,
+      xrpl: true,
+      xrplEvm: true
+    });
+    
+    try {
+      const prices = await getAllXRPBPrices();
+      
+      setXrpbPrices({
+        solana: prices.solana || 0.0001, // Fallback price
+        xrpl: prices.xrpl || 0.0001,
+        xrplEvm: prices.xrplEvm || 0.0001
+      });
+      
+      // Set main price to the first available price
+      const mainPrice = prices.solana || prices.xrpl || prices.xrplEvm || 3.10;
+      setXrpbPrice(mainPrice);
+      setLastPriceUpdate(new Date());
+      
+      console.log('✅ All XRPB prices fetched:', prices);
+    } catch (error) {
+      console.error('❌ Error fetching XRPB prices:', error);
+      // Set fallback prices
+      setXrpbPrices({
+        solana: 0.0001,
+        xrpl: 0.0001,
+        xrplEvm: 0.0001
+      });
+    } finally {
+      setPriceLoadingStates({
+        solana: false,
+        xrpl: false,
+        xrplEvm: false
+      });
+    }
+  }
+
+  useEffect(() => {
+    fetchAllXRPBPrices()
+    // Set up interval to refresh prices every 30 seconds
+    const interval = setInterval(fetchAllXRPBPrices, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const getPaymentAmountForWallet = (tier, walletType) => {
+    if (!tier || tier.priceUSD === 0) return 0;
+    
+    let priceToUse;
+    switch (walletType) {
+      case 'solana':
+        priceToUse = xrpbPrices.solana;
+        break;
+      case 'xrpl':
+        priceToUse = xrpbPrices.xrpl;
+        break;
+      case 'xrpl_evm':
+        priceToUse = xrpbPrices.xrplEvm;
+        break;
+      default:
+        priceToUse = Math.max(xrpbPrices.solana || 0, xrpbPrices.xrpl || 0, xrpbPrices.xrplEvm || 0) || 0.0001;
+    }
+    
+    if (!priceToUse || priceToUse <= 0) {
+      return 0; // Return 0 if no valid price
+    }
+    
+    return Math.ceil(tier.priceUSD / priceToUse);
+  }
 
   // Payment states
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedTier, setSelectedTier] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [lastPriceUpdate, setLastPriceUpdate] = useState(null)
   const {user} = useAuth()
   const [paymentResult, setPaymentResult] = useState(null)
   const [connectedWallets, setConnectedWallets] = useState([])
@@ -531,21 +614,104 @@ export default function MembershipPage() {
             </p>
             
             {/* XRPB Price Display */}
-            <div className="mt-6 flex justify-center">
-              <div className="bg-black/40 backdrop-blur-xl border border-[#39FF14]/30 rounded-2xl px-6 py-3">
-                <div className="flex items-center space-x-3">
-                  <DollarSign className="w-5 h-5 text-[#39FF14]" />
-                  <span className="text-white font-medium">
-                    XRPB Price: 
-                    {isLoadingPrice ? (
-                      <Loader2 className="w-4 h-4 animate-spin inline ml-2" />
-                    ) : (
-                      <span className="text-[#39FF14] font-bold ml-1">${xrpbPrice.toFixed(6)}</span>
-                    )}
-                  </span>
+            <div className="mb-16">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/10 to-emerald-400/10 rounded-3xl blur-xl"></div>
+              <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-8 rounded-3xl">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent flex items-center justify-center">
+                    <TrendingUp className="w-8 h-8 text-[#39FF14] mr-3" />
+                    Live XRPB Token Prices
+                  </h2>
+                  <p className="text-gray-300">Real-time prices across different blockchain networks</p>
+                  {lastPriceUpdate && (
+                    <p className="text-xs text-gray-500 mt-2 flex items-center justify-center">
+                      <Clock className="w-4 h-4 mr-1" />
+                      Last updated: {lastPriceUpdate.toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Solana Price */}
+                  <div className="group p-6 bg-black/40 border border-purple-500/30 rounded-2xl hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] transition-all duration-300">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">◎</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-white mb-2">Solana</h3>
+                      <p className="text-xs text-gray-400 mb-3">GeckoTerminal</p>
+                      {priceLoadingStates.solana ? (
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                          <span className="ml-2 text-gray-400">Loading...</span>
+                        </div>
+                      ) : (
+                        <div className="text-2xl font-black text-purple-400">
+                          {xrpbPrices.solana ? `$${xrpbPrices.solana.toFixed(8)}` : 'N/A'}
+                        </div>
+                      )}
+                      <p className="text-xs text-purple-300 mt-1">SOL Network</p>
+                    </div>
+                  </div>
+
+                  {/* XRPL Price */}
+                  <div className="group p-6 bg-black/40 border border-blue-500/30 rounded-2xl hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all duration-300">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">⚡</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-white mb-2">XRPL</h3>
+                      <p className="text-xs text-gray-400 mb-3">Order Book</p>
+                      {priceLoadingStates.xrpl ? (
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+                          <span className="ml-2 text-gray-400">Loading...</span>
+                        </div>
+                      ) : (
+                        <div className="text-2xl font-black text-blue-400">
+                          {xrpbPrices.xrpl ? `$${xrpbPrices.xrpl.toFixed(8)}` : 'N/A'}
+                        </div>
+                      )}
+                      <p className="text-xs text-blue-300 mt-1">XRP Ledger</p>
+                    </div>
+                  </div>
+
+                  {/* XRPL EVM Price */}
+                  <div className="group p-6 bg-black/40 border border-orange-500/30 rounded-2xl hover:border-orange-500/50 hover:shadow-[0_0_20px_rgba(249,115,22,0.2)] transition-all duration-300">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">🔗</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-white mb-2">XRPL EVM</h3>
+                      <p className="text-xs text-gray-400 mb-3">DEX Pool</p>
+                      {priceLoadingStates.xrplEvm ? (
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
+                          <span className="ml-2 text-gray-400">Loading...</span>
+                        </div>
+                      ) : (
+                        <div className="text-2xl font-black text-orange-400">
+                          {xrpbPrices.xrplEvm ? `$${xrpbPrices.xrplEvm.toFixed(8)}` : 'N/A'}
+                        </div>
+                      )}
+                      <p className="text-xs text-orange-300 mt-1">EVM Sidechain</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={fetchAllXRPBPrices}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#39FF14]/20 to-emerald-400/20 border border-[#39FF14]/30 rounded-xl text-[#39FF14] hover:shadow-[0_0_20px_rgba(57,255,20,0.3)] transition-all duration-300"
+                  >
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                    Refresh Prices
+                  </button>
                 </div>
               </div>
             </div>
+          </div>
             
             {/* Active Subscription Status */}
             {!membershipLoading && isSubscriptionActive && currentMembership && (
@@ -760,40 +926,60 @@ export default function MembershipPage() {
                     Choose Payment Method
                   </h3>
                   <div className="grid gap-4">
-                    {connectedWallets.map((wallet, index) => {
-                      const amount = getPaymentAmount(selectedTier, wallet.type)
-                      return (
-                        <div
-                          key={wallet.type}
-                          onClick={() => setPaymentMethod(wallet)}
-                          className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
-                            paymentMethod?.type === wallet.type
-                              ? 'border-[#39FF14] bg-[#39FF14]/10 shadow-[0_0_20px_rgba(57,255,20,0.3)]'
-                              : 'border-gray-600 bg-black/40 hover:border-[#39FF14]/50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <span className="text-3xl">{wallet.icon}</span>
-                              <div>
-                                <p className="text-white font-semibold">{wallet.name}</p>
-                                <p className="text-gray-400 text-sm font-mono">
-                                  {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[#39FF14] font-bold text-lg">
-                                {amount} {wallet.currency}
-                              </p>
-                              <p className="text-gray-400 text-sm">
-                                ≈ ${selectedTier?.priceUSD} USD
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+{connectedWallets.map((wallet, index) => {
+    const amount = getPaymentAmountForWallet(selectedTier, wallet.type)
+    const priceForWallet = xrpbPrices[wallet.type] || 0.01
+    const isLoadingPrice = priceLoadingStates[wallet.type]
+    
+    return (
+      <div
+        key={wallet.type}
+        onClick={() => setPaymentMethod(wallet)}
+        className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
+          paymentMethod?.type === wallet.type
+            ? 'border-[#39FF14] bg-[#39FF14]/10 shadow-[0_0_20px_rgba(57,255,20,0.3)]'
+            : 'border-gray-600 bg-black/40 hover:border-[#39FF14]/50'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <span className="text-3xl">{wallet.icon}</span>
+            <div>
+              <p className="text-white font-semibold">{wallet.name}</p>
+              <p className="text-gray-400 text-sm font-mono">
+                {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                XRPB Price: {isLoadingPrice ? (
+                  <span className="inline-flex items-center">
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    Loading...
+                  </span>
+                ) : (
+                  `$${(priceForWallet || 0.0001).toFixed(10)}`
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-[#39FF14] font-bold text-lg">
+              {isLoadingPrice ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                `${amount} ${wallet.currency}`
+              )}
+            </p>
+            <p className="text-gray-400 text-sm">
+              ≈ ${selectedTier?.priceUSD} USD
+            </p>
+            <p className="text-xs text-gray-500">
+              Rate: 1 XRPB = ${(priceForWallet || 0.0001).toFixed(10)}
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  })}
                   </div>
                 </div>
 
