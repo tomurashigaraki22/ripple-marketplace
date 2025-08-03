@@ -72,24 +72,30 @@ export default function ProductDetailPage() {
     }
     
     // Check if at least one connected wallet has a valid price
-    const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
-      const walletType = wallet.type === 'xrpl_evm' ? 'evm' : wallet.type;
-      let priceToCheck;
-      switch (walletType) {
-        case 'solana':
-          priceToCheck = xrpbPrices.solana;
-          break;
-        case 'xrp':
-          priceToCheck = xrpbPrices.xrpl;
-          break;
-        case 'evm':
-          priceToCheck = xrpbPrices.xrplEvm;
-          break;
-        default:
-          return false;
-      }
-      return priceToCheck && priceToCheck > 0.0001;
-    });
+const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
+  const walletType = wallet.type === 'xrpl_evm' ? 'evm' : wallet.type;
+  console.log("Wallet Type:", walletType);
+
+  let priceToCheck;
+
+  switch (walletType) {
+    case 'solana':
+      priceToCheck = xrpbPrices?.solana;
+      break;
+    case 'xrp':
+      priceToCheck = xrpbPrices?.xrpl;
+      break;
+    case 'evm':
+      priceToCheck = xrpbPrices?.xrplEvm;
+      break;
+    default:
+      return false;
+  }
+
+  // Ensure the price is not undefined, not 0.0001, and greater than 0
+  return priceToCheck !== undefined && priceToCheck !== 0.0001 && priceToCheck > 0;
+});
+
     
     if (!hasValidPriceForConnectedWallet) {
       return false;

@@ -135,28 +135,57 @@ const fetchOrders = async () => {
     }
   }
 
-  // ... existing code ...
-
-  useEffect(() => {
-    if (token && user) {
-      fetchOrders()
+  const handleConfirmReceived = async (orderId) => {
+    if (!token) {
+      alert('Please log in to perform this action')
+      return
     }
-  }, [token, user, selectedStatus, pagination.page])
+
+    try {
+      setConfirmingOrder(orderId)
+      
+      const response = await fetch(`/api/orders/confirm-received`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          orderId: orderId
+        })
+      })
+
+      if (response.ok) {
+        fetchOrders()
+        alert('Order confirmed as received successfully!')
+      } else {
+        const error = await response.json()
+        alert(`Error: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error confirming order received:', error)
+      alert('Failed to confirm order received')
+    } finally {
+      setConfirmingOrder(null)
+    }
+  }
 
   const getStatusIcon = (status) => {
     switch (status) {
       case 'pending':
-        return <Clock className="w-5 h-5 text-yellow-500" />
+        return <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
       case 'paid':
-        return <CheckCircle className="w-5 h-5 text-green-500" />
+        return <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
       case 'shipped':
-        return <Truck className="w-5 h-5 text-blue-500" />
+        return <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
       case 'delivered':
-        return <CheckCircle className="w-5 h-5 text-green-600" />
+        return <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
       case 'cancelled':
-        return <XCircle className="w-5 h-5 text-red-500" />
+        return <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
+      case 'escrow_funded':
+        return <Package className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
       default:
-        return <Package className="w-5 h-5 text-gray-500" />
+        return <Package className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
     }
   }
 
@@ -172,6 +201,8 @@ const fetchOrders = async () => {
         return 'bg-green-600/20 text-green-300 border-green-600/30'
       case 'cancelled':
         return 'bg-red-500/20 text-red-400 border-red-500/30'
+      case 'escrow_funded':
+        return 'bg-blue-400/20 text-blue-300 border-blue-400/30'
       default:
         return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
     }
@@ -193,36 +224,18 @@ const fetchOrders = async () => {
     { value: 'paid', label: 'Paid' },
     { value: 'shipped', label: 'Shipped' },
     { value: 'delivered', label: 'Delivered' },
-    { value: 'cancelled', label: 'Cancelled' }
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'escrow_funded', label: 'Escrow Funded' }
   ]
 
-  if (connectedWallets.length === 0) {
-    return (
-      <div className="min-h-screen bg-black text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold mb-4">My Orders</h1>
-            <p className="text-gray-400 mb-8">Please connect a wallet to view your orders</p>
-            <Link
-              href="/wallet"
-              className="inline-flex items-center px-6 py-3 bg-[#39FF14] text-black font-semibold rounded-xl hover:bg-[#39FF14]/90 transition-colors duration-300"
-            >
-              Connect Wallet
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+  // Show login prompt if not authenticated
   if (!token || !user) {
     return (
       <div className="min-h-screen bg-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
-            <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold mb-4">My Orders</h1>
+            <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-500 mx-auto mb-4" />
+            <h1 className="text-2xl sm:text-3xl font-bold mb-4">My Orders</h1>
             <p className="text-gray-400 mb-8">Please log in to view your orders</p>
             <Link
               href="/login"
@@ -256,25 +269,15 @@ const fetchOrders = async () => {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mt-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12 mt-10">
         {/* Header */}
-        <div className="mb-8">
-          {/* <div className="flex items-center mb-6">
-            <Link
-              href="/marketplace"
-              className="flex items-center text-gray-400 hover:text-[#39FF14] transition-colors duration-300 mr-4"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Marketplace
-            </Link>
-          </div> */}
-          
-          <div className="flex items-center justify-between">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-[#39FF14] to-white bg-clip-text text-transparent mb-2">
+              <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-white via-[#39FF14] to-white bg-clip-text text-transparent mb-2">
                 My Orders
               </h1>
-              <p className="text-gray-400">
+              <p className="text-gray-400 text-sm sm:text-base">
                 Track and manage your marketplace purchases
               </p>
             </div>
@@ -284,7 +287,7 @@ const fetchOrders = async () => {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="bg-black/60 border border-gray-600/50 rounded-xl px-4 py-2 text-white focus:border-[#39FF14]/50 focus:outline-none"
+                className="bg-black/60 border border-gray-600/50 rounded-xl px-3 py-2 text-sm sm:text-base text-white focus:border-[#39FF14]/50 focus:outline-none w-full sm:w-auto"
               >
                 {statusOptions.map(option => (
                   <option key={option.value} value={option.value}>
@@ -299,13 +302,13 @@ const fetchOrders = async () => {
         {/* Orders List */}
         {loading ? (
           <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#39FF14]"></div>
+            <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-[#39FF14]"></div>
           </div>
         ) : orders.length === 0 ? (
           <div className="text-center py-20">
-            <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No Orders Found</h3>
-            <p className="text-gray-400 mb-8">
+            <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-lg sm:text-xl font-semibold mb-2">No Orders Found</h3>
+            <p className="text-gray-400 mb-8 text-sm sm:text-base">
               {selectedStatus === 'all' 
                 ? "You haven't made any purchases yet" 
                 : `No orders with status: ${selectedStatus}`
@@ -319,14 +322,13 @@ const fetchOrders = async () => {
             </Link>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {orders.map((order) => {
               let images = []
               try {
                 images = order.listing_images ? JSON.parse(order.listing_images) : []
               } catch (error) {
                 console.warn('Invalid JSON in listing_images:', order.listing_images)
-                // If it's a single URL string, wrap it in an array
                 if (typeof order.listing_images === 'string' && order.listing_images.startsWith('http')) {
                   images = [order.listing_images]
                 }
@@ -337,12 +339,12 @@ const fetchOrders = async () => {
               return (
                 <div
                   key={order.id}
-                  className="bg-black/40 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-6 hover:border-[#39FF14]/30 transition-all duration-300"
+                  className="bg-black/40 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-4 sm:p-6 hover:border-[#39FF14]/30 transition-all duration-300"
                 >
-                  <div className="flex items-start space-x-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
                     {/* Order Image */}
-                    <div className="flex-shrink-0">
-                      <div className="w-24 h-24 rounded-xl overflow-hidden border border-gray-700/50">
+                    <div className="flex-shrink-0 self-center sm:self-start">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border border-gray-700/50">
                         <Image
                           src={order.listing_images[0]}
                           alt={order.listing_title}
@@ -355,32 +357,32 @@ const fetchOrders = async () => {
                     
                     {/* Order Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="text-lg font-semibold text-white mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="text-base sm:text-lg font-semibold text-white mb-1 line-clamp-2">
                             {order.listing_title}
                           </h3>
-                          <p className="text-gray-400 text-sm mb-2">
+                          <p className="text-gray-400 text-xs sm:text-sm mb-2">
                             Order #{order.id.slice(0, 8)}...
                           </p>
-                          <p className="text-gray-400 text-sm">
+                          <p className="text-gray-400 text-xs sm:text-sm">
                             Seller: {order.seller_username}
                           </p>
                         </div>
                         
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-[#39FF14] mb-2">
-                            {order.amount} USD
+                        <div className="text-left sm:text-right">
+                          <div className="text-lg sm:text-xl font-bold text-[#39FF14] mb-2">
+                            ${order.amount} USD
                           </div>
-                          <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full border text-sm font-medium ${getStatusColor(order.status)}`}>
+                          <div className={`inline-flex items-center space-x-2 px-2 sm:px-3 py-1 rounded-full border text-xs sm:text-sm font-medium ${getStatusColor(order.status)}`}>
                             {getStatusIcon(order.status)}
-                            <span className="capitalize">{order.status}</span>
+                            <span className="capitalize">{order.status.replace('_', ' ')}</span>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="mt-4 flex items-center justify-between">
-                        <div className="text-sm text-gray-400">
+                      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="text-xs sm:text-sm text-gray-400">
                           Ordered: {formatDate(order.created_at)}
                           {order.status === 'escrow_funded' && daysLeft > 0 && (
                             <div className="text-yellow-400 mt-1">
@@ -389,10 +391,10 @@ const fetchOrders = async () => {
                           )}
                         </div>
                         
-                        <div className="flex items-center space-x-3">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
                           <Link
                             href={`/marketplace/${order.listing_id}`}
-                            className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-800/50 text-gray-300 rounded-lg hover:bg-gray-700/50 hover:text-white transition-colors duration-300"
+                            className="inline-flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-gray-800/50 text-gray-300 rounded-lg hover:bg-gray-700/50 hover:text-white transition-colors duration-300 text-sm"
                           >
                             <Eye className="w-4 h-4" />
                             <span>View Item</span>
@@ -402,7 +404,7 @@ const fetchOrders = async () => {
                             <button
                               onClick={() => handleMarkDelivered(order.id)}
                               disabled={confirmingOrder === order.id}
-                              className="inline-flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
+                              className="inline-flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300 text-sm"
                             >
                               {confirmingOrder === order.id ? (
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -416,29 +418,29 @@ const fetchOrders = async () => {
                           )}
                           
                           {order.status === 'escrow_funded' && (
-    <button
-      onClick={() => handleConfirmReceived(order.id)}
-      disabled={confirmingOrder === order.id}
-      className="inline-flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
-    >
-      {confirmingOrder === order.id ? (
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-      ) : (
-        <>
-          <CheckCircle className="w-4 h-4" />
-          <span>Order Received</span>
-        </>
-      )}
-    </button>
-  )}
+                            <button
+                              onClick={() => handleConfirmReceived(order.id)}
+                              disabled={confirmingOrder === order.id}
+                              className="inline-flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300 text-sm"
+                            >
+                              {confirmingOrder === order.id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : (
+                                <>
+                                  <CheckCircle className="w-4 h-4" />
+                                  <span>Order Received</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
                       
                       {/* Shipping Address */}
                       {order.shipping_address && (
                         <div className="mt-4 p-3 bg-gray-900/50 rounded-lg">
-                          <h4 className="text-sm font-medium text-gray-300 mb-1">Shipping Address:</h4>
-                          <div className="text-sm text-gray-400">
+                          <h4 className="text-xs sm:text-sm font-medium text-gray-300 mb-1">Shipping Address:</h4>
+                          <div className="text-xs sm:text-sm text-gray-400">
                             {typeof order.shipping_address === 'string' ? (
                               <p>{order.shipping_address}</p>
                             ) : (
@@ -464,23 +466,23 @@ const fetchOrders = async () => {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex justify-center items-center space-x-4 mt-12">
+          <div className="flex justify-center items-center space-x-4 mt-8 sm:mt-12">
             <button
               onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
               disabled={pagination.page === 1}
-              className="px-4 py-2 bg-gray-800/50 text-gray-300 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
+              className="px-3 sm:px-4 py-2 bg-gray-800/50 text-gray-300 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300 text-sm"
             >
               Previous
             </button>
             
-            <span className="text-gray-400">
+            <span className="text-gray-400 text-sm">
               Page {pagination.page} of {pagination.totalPages}
             </span>
             
             <button
               onClick={() => setPagination(prev => ({ ...prev, page: Math.min(prev.totalPages, prev.page + 1) }))}
               disabled={pagination.page === pagination.totalPages}
-              className="px-4 py-2 bg-gray-800/50 text-gray-300 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
+              className="px-3 sm:px-4 py-2 bg-gray-800/50 text-gray-300 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300 text-sm"
             >
               Next
             </button>
