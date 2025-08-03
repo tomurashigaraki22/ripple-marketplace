@@ -38,8 +38,8 @@ export const XRPLProvider = ({ children }) => {
   const getXrpbBalance = async (address) => {
     try {
       // Replace with actual XRPB token details
-      const XRPB_CURRENCY = 'XRPB';
-      const XRPB_ISSUER = 'YOUR_XRPB_ISSUER_ADDRESS'; // Replace with actual issuer
+      const XRPB_CURRENCY = '5852504200000000000000000000000000000000';
+      const XRPB_ISSUER = 'rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT'; // Replace with actual issuer
       
       const response = await fetch(`https://api.xrpscan.com/api/v1/account/${address}/balances`);
       const data = await response.json();
@@ -166,6 +166,8 @@ export const XRPLProvider = ({ children }) => {
       }
 
       console.log('🔗 Setting up XRPB trustline...');
+            const XRPB_ISSUER = "rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT"
+      const XRPB_CURRENCY = "5852504200000000000000000000000000000000"
       
       // Create trustline payload for XUMM
       const trustlinePayload = {
@@ -240,6 +242,8 @@ export const XRPLProvider = ({ children }) => {
       
       const response = await fetch(`https://api.xrpscan.com/api/v1/account/${address}/balances`);
       const data = await response.json();
+      const XRPB_ISSUER = "rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT"
+      const XRPB_CURRENCY = "5852504200000000000000000000000000000000"
       
       const xrpbTrustline = data.find(token => 
         token.currency === XRPB_CURRENCY && token.issuer === XRPB_ISSUER
