@@ -128,9 +128,27 @@ export async function POST(request) {
       blockchain = determineBlockchainFromTxHash(escrow.transaction_hash);
     }
 
-    // Calculate release amount (subtract platform fee)
-    const platformFeePercent = 0.025; // 2.5%
+    // Calculate release amount based on membership tier (replace the existing fee calculation)
+    // Get user's membership tier
+    const [userMembership] = await db.query(
+      'SELECT membership_tier_id FROM users WHERE id = ?',
+      [user.id]
+    );
+    
+    let platformFeePercent = 0.025; // Default 2.5%
+    
+    if (userMembership.length > 0) {
+      const tierID = userMembership[0].membership_tier_id;
+      if (tierID === 2) {
+        platformFeePercent = 0.025; // 2.5% for tier 2 (pro)
+      } else if (tierID === 3) {
+        platformFeePercent = 0.015; // 1.5% for tier 3 (premium)
+      }
+      // tier 1 (basic) keeps default 2.5%
+    }
+    
     const releaseAmount = parseFloat(escrow.amount) * (1 - platformFeePercent);
+    const feeAmount = parseFloat(escrow.amount) * platformFeePercent;
 
     // Perform actual blockchain transfer
     let releaseHash;

@@ -103,6 +103,86 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
     
     return true;
   };
+  
+  // Helper function to render conditional field
+  const renderField = (label, value, icon = null) => {
+    if (!value || (typeof value === 'string' && value.trim() === '')) return null;
+    
+    return (
+      <div className="flex items-center justify-between py-2 border-b border-gray-700/50 last:border-b-0">
+        <span className="text-gray-400 text-sm flex items-center gap-2">
+          {icon && <span className="text-[#39FF14]">{icon}</span>}
+          {label}:
+        </span>
+        <span className="text-white font-medium text-sm">{value}</span>
+      </div>
+    )
+  }
+
+  // Helper function to get category-specific fields
+  const getCategorySpecificFields = (listing) => {
+    const fields = []
+    
+    // Common fields for all categories
+    if (listing.brand) fields.push(renderField('Brand', listing.brand, '🏷️'))
+    if (listing.model) fields.push(renderField('Model', listing.model, '📱'))
+    if (listing.condition_type) fields.push(renderField('Condition', listing.condition_type, '⭐'))
+    
+    // Category-specific fields
+    switch (listing.category) {
+      case 'fashion':
+      case 'clothing':
+        if (listing.size) fields.push(renderField('Size', listing.size, '📏'))
+        if (listing.color) fields.push(renderField('Color', listing.color, '🎨'))
+        if (listing.material) fields.push(renderField('Material', listing.material, '🧵'))
+        break
+        
+      case 'electronics':
+      case 'technology':
+        if (listing.year_manufactured) fields.push(renderField('Year', listing.year_manufactured, '📅'))
+        if (listing.warranty_info) fields.push(renderField('Warranty', listing.warranty_info, '🛡️'))
+        break
+        
+      case 'books':
+      case 'media':
+        if (listing.isbn) fields.push(renderField('ISBN', listing.isbn, '📚'))
+        if (listing.year_manufactured) fields.push(renderField('Publication Year', listing.year_manufactured, '📅'))
+        break
+        
+      case 'collectibles':
+      case 'art':
+        if (listing.year_manufactured) fields.push(renderField('Year Made', listing.year_manufactured, '🎨'))
+        if (listing.material) fields.push(renderField('Material', listing.material, '🏺'))
+        break
+        
+      case 'automotive':
+      case 'vehicles':
+        if (listing.year_manufactured) fields.push(renderField('Year', listing.year_manufactured, '🚗'))
+        if (listing.color) fields.push(renderField('Color', listing.color, '🎨'))
+        break
+    }
+    
+    // Physical item specific fields
+    if (listing.is_physical) {
+      if (listing.weight) fields.push(renderField('Weight', `${listing.weight} kg`, '⚖️'))
+      if (listing.dimensions) {
+        const dims = listing.dimensions
+        if (dims.length && dims.width && dims.height) {
+          fields.push(renderField('Dimensions', `${dims.length} × ${dims.width} × ${dims.height} ${dims.unit || 'cm'}`, '📦'))
+        }
+      }
+      if (listing.location) fields.push(renderField('Location', listing.location, '📍'))
+    }
+    
+    // Additional fields
+    if (listing.sku) fields.push(renderField('SKU', listing.sku, '🔢'))
+    if (listing.upc_ean) fields.push(renderField('UPC/EAN', listing.upc_ean, '📊'))
+    if (listing.quantity_available && listing.quantity_available > 1) {
+      fields.push(renderField('Available', `${listing.quantity_available} units`, '📦'))
+    }
+    
+    return fields
+  }
 
   // Helper function to get error message when buy button is hidden
   const getBuyButtonErrorMessage = () => {
@@ -1306,8 +1386,117 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                   </div>
                 </div>
               </div>
-
-              {/* ... existing code ... */}
+              
+              {/* Enhanced Product Details Section */}
+              <div className="card-glow p-6 rounded-lg mb-4">
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-[#39FF14]" />
+                  Product Details
+                </h3>
+                
+                {/* Basic Information */}
+                <div className="space-y-1 mb-6">
+                  {renderField('Category', listing.category?.charAt(0).toUpperCase() + listing.category?.slice(1), '📂')}
+                  {listing.subcategory && renderField('Subcategory', listing.subcategory?.charAt(0).toUpperCase() + listing.subcategory?.slice(1), '📁')}
+                  
+                  {/* Category-specific fields */}
+                  {getCategorySpecificFields(listing)}
+                </div>
+                
+                {/* Pricing Information */}
+                {(listing.original_price || listing.discount_percentage) && (
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                    <h4 className="text-green-400 font-semibold mb-2 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Pricing Details
+                    </h4>
+                    <div className="space-y-1">
+                      {listing.original_price && renderField('Original Price', `$${listing.original_price}`)}
+                      {listing.discount_percentage && renderField('Discount', `${listing.discount_percentage}%`)}
+                      {listing.original_price && listing.discount_percentage && (
+                        renderField('You Save', `$${(listing.original_price * listing.discount_percentage / 100).toFixed(2)}`)
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Features */}
+                {listing.features && listing.features.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-white font-semibold mb-2 flex items-center gap-2">
+                      <span className="text-[#39FF14]">✨</span>
+                      Key Features
+                    </h4>
+                    <ul className="space-y-1">
+                      {listing.features.map((feature, index) => (
+                        <li key={index} className="text-gray-300 text-sm flex items-start gap-2">
+                          <span className="text-[#39FF14] mt-1">•</span>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {/* Specifications */}
+                {listing.specifications && Object.keys(listing.specifications).length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-white font-semibold mb-2 flex items-center gap-2">
+                      <span className="text-[#39FF14]">🔧</span>
+                      Specifications
+                    </h4>
+                    <div className="space-y-1">
+                      {Object.entries(listing.specifications).map(([key, value]) => (
+                        renderField(key.charAt(0).toUpperCase() + key.slice(1), value)
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Warranty & Return Policy */}
+                {(listing.warranty_info || listing.return_policy) && (
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4">
+                    <h4 className="text-blue-400 font-semibold mb-2 flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      Warranty & Returns
+                    </h4>
+                    <div className="space-y-1">
+                      {listing.warranty_info && renderField('Warranty', listing.warranty_info)}
+                      {listing.return_policy && renderField('Return Policy', listing.return_policy)}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Shipping Information */}
+                {listing.shipping_info && (
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 mb-4">
+                    <h4 className="text-orange-400 font-semibold mb-2 flex items-center gap-2">
+                      <Truck className="w-4 h-4" />
+                      Shipping Information
+                    </h4>
+                    <div className="space-y-1">
+                      {typeof listing.shipping_info === 'object' ? (
+                        Object.entries(listing.shipping_info).map(([key, value]) => (
+                          renderField(key.charAt(0).toUpperCase() + key.slice(1), value)
+                        ))
+                      ) : (
+                        <p className="text-gray-300 text-sm">{listing.shipping_info}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Age Restriction */}
+                {listing.age_restriction && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                    <h4 className="text-red-400 font-semibold mb-2 flex items-center gap-2">
+                      <Flag className="w-4 h-4" />
+                      Age Restriction
+                    </h4>
+                    <p className="text-gray-300 text-sm">{listing.age_restriction}+ years required</p>
+                  </div>
+                )}
+              </div>
 
               {shouldShowBuyButton() && (
                 <div className="grid grid-cols-1 gap-4">

@@ -153,7 +153,7 @@ export default function HomePage() {
                   </div>
                   <div>
                     <h4 className="font-bold text-lg text-white mb-2">XRPB Token Utility</h4>
-                    <p className="text-gray-400 leading-relaxed">Use XRPB for purchases, staking rewards, and exclusive premium marketplace features</p>
+                    <p className="text-gray-400 leading-relaxed">Use XRPB for purchases, and exclusive premium marketplace features</p>
                   </div>
                 </div>
                 

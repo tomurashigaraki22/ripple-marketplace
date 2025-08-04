@@ -4,11 +4,11 @@ import { db } from '../../../lib/db.js'
 // GET - Fetch specific listing details for marketplace
 export async function GET(request, { params }) {
   try {
-    const { id } = await params // Await params before destructuring
+    const { id } = await params
     const url = new URL(request.url)
-    const walletAddress = url.searchParams.get('wallet') // Connected wallet address
+    const walletAddress = url.searchParams.get('wallet')
 
-    // Get listing details with seller information
+    // Get listing details with seller information and enhanced fields
     const [listings] = await db.query(
       `SELECT 
         l.id,
@@ -16,8 +16,51 @@ export async function GET(request, { params }) {
         l.description,
         l.price,
         l.category,
+        l.subcategory,
+        l.brand,
+        l.model,
+        l.condition_type,
         l.chain,
         l.is_physical,
+        l.weight,
+        l.length,
+        l.width,
+        l.height,
+        l.color,
+        l.size,
+        l.material,
+        l.sku,
+        l.isbn,
+        l.upc_ean,
+        l.country,
+        l.state_province,
+        l.city,
+        l.original_price,
+        l.discount_percentage,
+        l.bulk_pricing,
+        l.key_features,
+        l.technical_specs,
+        l.compatibility,
+        l.warranty_period,
+        l.warranty_type,
+        l.return_policy,
+        l.return_period_days,
+        l.shipping_weight,
+        l.shipping_dimensions,
+        l.shipping_cost,
+        l.free_shipping,
+        l.shipping_methods,
+        l.processing_time_days,
+        l.quantity_available,
+        l.min_order_quantity,
+        l.max_order_quantity,
+        l.age_restriction,
+        l.requires_assembly,
+        l.energy_rating,
+        l.certifications,
+        l.included_accessories,
+        l.care_instructions,
+        l.storage_requirements,
         l.images,
         l.tags,
         l.views,
@@ -28,8 +71,8 @@ export async function GET(request, { params }) {
        FROM listings l
        JOIN users u ON l.user_id = u.id
        WHERE l.id = ? AND l.status = 'approved'`,
-      [id]
-    )
+      [params.id]
+    );
 
     if (listings.length === 0) {
       return NextResponse.json(
@@ -96,11 +139,15 @@ export async function GET(request, { params }) {
       [id]
     )
 
-    // Format the response
+    // Format the response with enhanced fields
     const formattedListing = {
       ...listing,
       images: typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images,
       tags: typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags,
+      dimensions: typeof listing.dimensions === 'string' ? JSON.parse(listing.dimensions) : listing.dimensions,
+      features: typeof listing.features === 'string' ? JSON.parse(listing.features) : listing.features,
+      specifications: typeof listing.specifications === 'string' ? JSON.parse(listing.specifications) : listing.specifications,
+      shipping_info: typeof listing.shipping_info === 'string' ? JSON.parse(listing.shipping_info) : listing.shipping_info,
       seller: {
         id: listing.seller_id,
         username: listing.seller_username,

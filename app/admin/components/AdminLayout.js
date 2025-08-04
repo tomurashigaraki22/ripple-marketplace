@@ -17,6 +17,8 @@ export default function AdminLayout({ children }) {
     { name: 'Listings', href: '/admin/listings', icon: Package },
     { name: 'Memberships', href: '/admin/memberships', icon: Shield },
     { name: 'Orders', href: '/admin/orders', icon: CreditCard },
+    { name: 'Escrows', href: '/admin/escrows', icon: Shield },
+    { name: 'Audit Trail', href: '/admin/audit', icon: BarChart3 },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ]

@@ -37,12 +37,12 @@ export default function FAQsPage() {
         {
           question: "What is XRPB token?",
           answer:
-            "XRPB is the native utility token of RippleBids. It's used for purchases, membership rewards, staking access, and unlocking premium features across the platform.",
+            "XRPB is the native utility token of RippleBids. It's used for purchases, membership rewards, and unlocking premium features across the platform.",
         },
         {
           question: "How can I get XRPB tokens?",
           answer:
-            "You can get XRPB tokens through: 1) Our airdrop program, 2) Purchasing directly on the platform, 3) Earning through staking rewards, 4) Trading on supported exchanges.",
+            "You can get XRPB tokens through: 1) Our airdrop program, 2) Purchasing directly on the platform, 3) Trading on supported exchanges.",
         },
         {
           question: "What can I do with XRPB tokens?",

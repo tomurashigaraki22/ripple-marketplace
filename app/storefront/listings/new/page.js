@@ -1,24 +1,79 @@
 "use client"
 import { useState } from "react"
-import { Upload, Image as ImageIcon, DollarSign, Package, Globe, X, Loader } from "lucide-react"
+import { Upload, DollarSign, Package, X, Plus, Minus, Camera } from "lucide-react"
 import { useRouter } from "next/navigation"
 import StorefrontLayout from "../../components/StorefrontLayout"
+import { CATEGORIES, CONDITIONS, SIZES, COLORS } from "../../../utils/categories"
 
 export default function NewListing() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     price: "",
-    category: "art",
+    category: "",
+    subcategory: "",
+    brand: "",
+    model: "",
+    condition_type: "new",
     chain: "xrp",
     isPhysical: false,
+    weight: "",
+    dimensions: { length: "", width: "", height: "", unit: "cm" },
+    color: "",
+    size: "",
+    material: "",
+    year_manufactured: "",
+    warranty_info: "",
+    shipping_info: {
+      free_shipping: false,
+      shipping_cost: "",
+      processing_time: "1-3",
+      shipping_methods: []
+    },
+    return_policy: "",
+    quantity_available: 1,
+    sku: "",
+    isbn: "",
+    upc_ean: "",
     images: [],
-    tags: ""
+    tags: "",
+    features: [],
+    specifications: {},
+    compatibility: [],
+    included_items: [],
+    location_city: "",
+    location_state: "",
+    location_country: "US",
+    is_negotiable: false,
+    min_offer_price: "",
+    is_auction: false,
+    auction_end_date: "",
+    reserve_price: "",
+    buy_it_now_price: ""
   })
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({})
   const router = useRouter()
+
+  const [fieldToggles, setFieldToggles] = useState({
+    showColor: false,
+    showSize: false,
+    showMaterial: false,
+    showBrand: false,
+    showModel: false,
+    showWeight: false,
+    showDimensions: false,
+    showYear: false,
+    showWarranty: false,
+    showSKU: false,
+    showISBN: false,
+    showUPC: false,
+    showFeatures: false,
+    showCompatibility: false,
+    showIncludedItems: false
+  })
 
   // Generate signature for signed upload
   const generateSignature = async (params) => {
@@ -208,50 +263,149 @@ export default function NewListing() {
     }
   }
 
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target
+    
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.')
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: type === 'checkbox' ? checked : value
+        }
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }))
+    }
+  }
+
+  const handleToggleChange = (toggleName) => {
+    setFieldToggles(prev => ({
+      ...prev,
+      [toggleName]: !prev[toggleName]
+    }))
+  }
+
+  const addFeature = () => {
+    setFormData(prev => ({
+      ...prev,
+      features: [...prev.features, ""]
+    }))
+  }
+
+  const updateFeature = (index, value) => {
+    setFormData(prev => ({
+      ...prev,
+      features: prev.features.map((feature, i) => i === index ? value : feature)
+    }))
+  }
+
+  const removeFeature = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      features: prev.features.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Helper function to check if field is relevant for category
+  const isFieldRelevantForCategory = (fieldName) => {
+    if (!formData.category) return true
+    
+    const categoryConfig = {
+      'electronics': ['showBrand', 'showModel', 'showColor', 'showWeight', 'showDimensions', 'showYear', 'showWarranty', 'showSKU', 'showFeatures', 'showCompatibility'],
+      'fashion': ['showBrand', 'showColor', 'showSize', 'showMaterial', 'showYear'],
+      'home-garden': ['showBrand', 'showModel', 'showColor', 'showSize', 'showMaterial', 'showWeight', 'showDimensions'],
+      'sports': ['showBrand', 'showModel', 'showColor', 'showSize', 'showMaterial', 'showWeight'],
+      'books': ['showISBN', 'showYear', 'showWeight'],
+      'art': ['showMaterial', 'showDimensions', 'showYear', 'showWeight'],
+      'automotive': ['showBrand', 'showModel', 'showYear', 'showColor', 'showWeight', 'showCompatibility', 'showWarranty'],
+      'health-beauty': ['showBrand', 'showSize', 'showWeight', 'showYear'],
+      'toys-games': ['showBrand', 'showModel', 'showColor', 'showWeight', 'showDimensions', 'showYear'],
+      'music': ['showBrand', 'showModel', 'showColor', 'showWeight', 'showYear'],
+      'collectibles': ['showBrand', 'showModel', 'showYear', 'showMaterial', 'showColor'],
+      'other': ['showBrand', 'showModel', 'showColor', 'showSize', 'showMaterial', 'showWeight', 'showDimensions', 'showYear']
+    }
+    
+    return categoryConfig[formData.category]?.includes(fieldName) ?? true
+  }
+
   return (
     <StorefrontLayout>
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-white">Create New Listing</h1>
-          <p className="text-gray-400 mt-2">Add a new item to your storefront</p>
+          <p className="text-gray-400 mt-2">Add a comprehensive listing to your storefront</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Information */}
           <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
             <h3 className="text-xl font-bold text-white mb-6">Basic Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-white mb-2">Title</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Title */}
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-white mb-2">Title *</label>
                 <input
                   type="text"
+                  name="title"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={handleInputChange}
                   className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
                   placeholder="Enter listing title"
                   required
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-white mb-2">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={4}
-                  className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
-                  placeholder="Describe your item in detail"
-                  required
-                />
-              </div>
+
+              {/* Category */}
               <div>
-                <label className="block text-sm font-medium text-white mb-2">Price (USD)</label>
+                <label className="block text-sm font-medium text-white mb-2">Category *</label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {Object.entries(CATEGORIES).map(([key, category]) => (
+                    <option key={key} value={key}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Subcategory */}
+              {formData.category && (
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Subcategory</label>
+                  <select
+                    name="subcategory"
+                    value={formData.subcategory}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                  >
+                    <option value="">Select subcategory</option>
+                    {CATEGORIES[formData.category]?.subcategories.map(sub => (
+                      <option key={sub} value={sub}>{sub.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Price */}
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Price (USD) *</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="number"
+                    name="price"
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    onChange={handleInputChange}
                     className="w-full pl-10 pr-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
                     placeholder="0.00"
                     step="0.01"
@@ -259,67 +413,47 @@ export default function NewListing() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Category</label>
+
+              {/* Condition */}
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-white mb-2">Condition *</label>
                 <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  name="condition_type"
+                  value={formData.condition_type}
+                  onChange={handleInputChange}
                   className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                  required
                 >
-                  <option value="art">Digital Art</option>
-                  <option value="gaming">Gaming</option>
-                  <option value="music">Music</option>
-                  <option value="collectibles">Collectibles</option>
-                  <option value="photography">Photography</option>
-                  <option value="utility">Utility</option>
+                  {CONDITIONS.map(condition => (
+                    <option key={condition.value} value={condition.value}>
+                      {condition.label} - {condition.description}
+                    </option>
+                  ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Blockchain</label>
-                <select
-                  value={formData.chain}
-                  onChange={(e) => setFormData({ ...formData, chain: e.target.value })}
-                  className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
-                >
-                  <option value="xrp">XRP Ledger</option>
-                  <option value="evm">EVM (Ethereum)</option>
-                  <option value="solana">Solana</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">Item Type</label>
-                <div className="flex space-x-4">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="itemType"
-                      checked={!formData.isPhysical}
-                      onChange={() => setFormData({ ...formData, isPhysical: false })}
-                      className="text-[#39FF14] focus:ring-[#39FF14]"
-                    />
-                    <span className="text-white">Digital</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="itemType"
-                      checked={formData.isPhysical}
-                      onChange={() => setFormData({ ...formData, isPhysical: true })}
-                      className="text-[#39FF14] focus:ring-[#39FF14]"
-                    />
-                    <span className="text-white">Physical</span>
-                  </label>
-                </div>
+
+              {/* Description */}
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-white mb-2">Description *</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                  placeholder="Describe your item in detail"
+                  required
+                />
               </div>
             </div>
           </div>
 
-          {/* Images */}
+          {/* Images Upload */}
           <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
             <h3 className="text-xl font-bold text-white mb-6">Images</h3>
             
             {/* Upload Area */}
-            <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-[#39FF14]/50 transition-colors mb-6">
+            <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-[#39FF14]/50 transition-colors">
               <input
                 type="file"
                 multiple
@@ -329,76 +463,58 @@ export default function NewListing() {
                 id="image-upload"
                 disabled={uploadingImages}
               />
-              <label htmlFor="image-upload" className={`cursor-pointer ${uploadingImages ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                {uploadingImages ? (
-                  <Loader className="w-12 h-12 text-[#39FF14] mx-auto mb-4 animate-spin" />
-                ) : (
-                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                )}
-                <p className="text-white font-medium mb-2">
-                  {uploadingImages ? 'Uploading Images...' : 'Upload Images'}
-                </p>
-                <p className="text-gray-400 text-sm">
-                  {uploadingImages ? 'Please wait while images are being uploaded' : 'Drag and drop or click to select files'}
-                </p>
+              <label htmlFor="image-upload" className="cursor-pointer">
+                <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-white font-medium mb-2">Click to upload images</p>
+                <p className="text-gray-400 text-sm">PNG, JPG, GIF up to 10MB each</p>
               </label>
             </div>
 
             {/* Upload Progress */}
             {Object.keys(uploadProgress).length > 0 && (
-              <div className="mb-6 space-y-2">
-                <h4 className="text-white font-medium mb-3">Upload Progress</h4>
+              <div className="mt-4 space-y-2">
                 {Object.entries(uploadProgress).map(([fileId, progress]) => (
-                  <div key={fileId} className="bg-black/20 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-300 truncate">{progress.name}</span>
-                      <span className={`text-xs ${
-                        progress.status === 'completed' ? 'text-green-400' :
-                        progress.status === 'error' ? 'text-red-400' :
-                        'text-[#39FF14]'
-                      }`}>
-                        {progress.status === 'completed' ? 'Completed' :
-                         progress.status === 'error' ? 'Failed' :
-                         'Uploading...'}
+                  <div key={fileId} className="bg-gray-800 rounded-lg p-3">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-white truncate">{progress.name}</span>
+                      <span className="text-xs text-gray-400">
+                        {progress.status === 'completed' ? 'Completed' : 
+                         progress.status === 'error' ? 'Error' : 'Uploading...'}
                       </span>
                     </div>
-                    {progress.status === 'uploading' && (
-                      <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div 
-                          className="bg-[#39FF14] h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${progress.progress}%` }}
-                        ></div>
-                      </div>
-                    )}
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all ${
+                          progress.status === 'completed' ? 'bg-green-500' :
+                          progress.status === 'error' ? 'bg-red-500' : 'bg-[#39FF14]'
+                        }`}
+                        style={{ width: `${progress.progress}%` }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Uploaded Images Preview */}
+            {/* Uploaded Images */}
             {formData.images.length > 0 && (
-              <div>
+              <div className="mt-6">
                 <h4 className="text-white font-medium mb-3">Uploaded Images ({formData.images.length})</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {formData.images.map((image, index) => (
                     <div key={index} className="relative group">
                       <img
                         src={image.url}
-                        alt={image.originalName || `Image ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border border-white/10"
+                        alt={`Upload ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border border-gray-600"
                       />
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X className="w-4 h-4" />
                       </button>
-                      <div className="absolute bottom-2 left-2 right-2">
-                        <p className="text-xs text-white bg-black/70 rounded px-2 py-1 truncate">
-                          {image.originalName || `Image ${index + 1}`}
-                        </p>
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -406,22 +522,499 @@ export default function NewListing() {
             )}
           </div>
 
-          {/* Submit */}
+          {/* Item Details with Toggles */}
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-white mb-6">Item Details</h3>
+            
+            {/* Item Type */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-white mb-2">Item Type *</label>
+              <div className="flex space-x-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="isPhysical"
+                    checked={!formData.isPhysical}
+                    onChange={() => setFormData(prev => ({ ...prev, isPhysical: false }))}
+                    className="text-[#39FF14] focus:ring-[#39FF14]"
+                  />
+                  <span className="text-white">Digital</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="isPhysical"
+                    checked={formData.isPhysical}
+                    onChange={() => setFormData(prev => ({ ...prev, isPhysical: true }))}
+                    className="text-[#39FF14] focus:ring-[#39FF14]"
+                  />
+                  <span className="text-white">Physical</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Blockchain */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-white mb-2">Blockchain *</label>
+              <select
+                name="chain"
+                value={formData.chain}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                required
+              >
+                <option value="xrp">XRP Ledger</option>
+                <option value="evm">EVM (Ethereum)</option>
+                <option value="solana">Solana</option>
+              </select>
+            </div>
+
+            {/* Optional Fields with Toggles */}
+            <div className="space-y-6">
+              {/* Brand Toggle */}
+              {isFieldRelevantForCategory('showBrand') && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Brand Information</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showBrand')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showBrand ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showBrand ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showBrand && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Brand</label>
+                        <input
+                          type="text"
+                          name="brand"
+                          value={formData.brand}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                          placeholder="e.g. Apple, Nike, Samsung"
+                        />
+                      </div>
+                      {fieldToggles.showModel && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">Model</label>
+                          <input
+                            type="text"
+                            name="model"
+                            value={formData.model}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                            placeholder="e.g. iPhone 15 Pro, Air Jordan 1"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Model Toggle */}
+              {isFieldRelevantForCategory('showModel') && !fieldToggles.showBrand && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Model Information</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showModel')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showModel ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showModel ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showModel && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Model</label>
+                      <input
+                        type="text"
+                        name="model"
+                        value={formData.model}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                        placeholder="e.g. iPhone 15 Pro, Air Jordan 1"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Color Toggle */}
+              {isFieldRelevantForCategory('showColor') && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Color Specification</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showColor')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showColor ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showColor ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showColor && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Color</label>
+                      <select
+                        name="color"
+                        value={formData.color}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                      >
+                        <option value="">Select color</option>
+                        {COLORS.map(color => (
+                          <option key={color} value={color}>{color}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Size Toggle */}
+              {isFieldRelevantForCategory('showSize') && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Size Information</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showSize')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showSize ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showSize ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showSize && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Size</label>
+                      <input
+                        type="text"
+                        name="size"
+                        value={formData.size}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                        placeholder="e.g. Large, 10.5, 32GB"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Material Toggle */}
+              {isFieldRelevantForCategory('showMaterial') && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Material Information</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showMaterial')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showMaterial ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showMaterial ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showMaterial && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Material</label>
+                      <input
+                        type="text"
+                        name="material"
+                        value={formData.material}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                        placeholder="e.g. Cotton, Aluminum, Leather"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Physical Item Specific Fields */}
+              {formData.isPhysical && (
+                <>
+                  {/* Weight Toggle */}
+                  {isFieldRelevantForCategory('showWeight') && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium text-white">Weight & Dimensions</label>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleChange('showWeight')}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            fieldToggles.showWeight ? 'bg-[#39FF14]' : 'bg-gray-600'
+                          }`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            fieldToggles.showWeight ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                      {fieldToggles.showWeight && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Weight (kg)</label>
+                            <input
+                              type="number"
+                              name="weight"
+                              value={formData.weight}
+                              onChange={handleInputChange}
+                              step="0.01"
+                              className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Dimensions (L x W x H cm)</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <input
+                                type="number"
+                                name="dimensions.length"
+                                value={formData.dimensions.length}
+                                onChange={handleInputChange}
+                                placeholder="Length"
+                                className="px-3 py-2 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none text-sm"
+                              />
+                              <input
+                                type="number"
+                                name="dimensions.width"
+                                value={formData.dimensions.width}
+                                onChange={handleInputChange}
+                                placeholder="Width"
+                                className="px-3 py-2 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none text-sm"
+                              />
+                              <input
+                                type="number"
+                                name="dimensions.height"
+                                value={formData.dimensions.height}
+                                onChange={handleInputChange}
+                                placeholder="Height"
+                                className="px-3 py-2 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Additional Optional Fields */}
+              {/* Year Toggle */}
+              {isFieldRelevantForCategory('showYear') && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Year Information</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showYear')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showYear ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showYear ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showYear && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Year Manufactured</label>
+                      <input
+                        type="number"
+                        name="year_manufactured"
+                        value={formData.year_manufactured}
+                        onChange={handleInputChange}
+                        min="1900"
+                        max={new Date().getFullYear()}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                        placeholder={new Date().getFullYear()}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SKU Toggle */}
+              {isFieldRelevantForCategory('showSKU') && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Product Identifiers</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showSKU')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showSKU ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showSKU ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showSKU && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">SKU</label>
+                        <input
+                          type="text"
+                          name="sku"
+                          value={formData.sku}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                          placeholder="Stock Keeping Unit"
+                        />
+                      </div>
+                      {isFieldRelevantForCategory('showISBN') && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">ISBN</label>
+                          <input
+                            type="text"
+                            name="isbn"
+                            value={formData.isbn}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                            placeholder="For books"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">UPC/EAN</label>
+                        <input
+                          type="text"
+                          name="upc_ean"
+                          value={formData.upc_ean}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                          placeholder="Barcode number"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Features Toggle */}
+              {isFieldRelevantForCategory('showFeatures') && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-white">Key Features</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange('showFeatures')}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        fieldToggles.showFeatures ? 'bg-[#39FF14]' : 'bg-gray-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        fieldToggles.showFeatures ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {fieldToggles.showFeatures && (
+                    <div>
+                      <div className="space-y-3">
+                        {formData.features.map((feature, index) => (
+                          <div key={index} className="flex gap-2">
+                            <input
+                              type="text"
+                              value={feature}
+                              onChange={(e) => updateFeature(index, e.target.value)}
+                              className="flex-1 px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                              placeholder="Enter a key feature"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeFeature(index)}
+                              className="px-3 py-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 hover:bg-red-500/30 transition-colors"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={addFeature}
+                          className="flex items-center gap-2 px-4 py-3 bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg text-[#39FF14] hover:bg-[#39FF14]/20 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Feature
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-white mb-6">Tags & Keywords</h3>
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">Tags</label>
+              <input
+                type="text"
+                name="tags"
+                value={formData.tags}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                placeholder="Enter tags separated by commas (e.g. vintage, rare, collectible)"
+              />
+              <p className="text-gray-400 text-sm mt-2">Add relevant keywords to help buyers find your listing</p>
+            </div>
+          </div>
+
+          {/* Submit Button */}
           <div className="flex justify-end space-x-4">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-3 border border-gray-600 text-gray-400 rounded-lg hover:border-gray-500 hover:text-white transition-colors"
-              disabled={isSubmitting || uploadingImages}
+              className="px-6 py-3 border border-gray-600 rounded-lg text-white hover:bg-gray-800 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || uploadingImages || formData.images.length === 0}
-              className="px-6 py-3 bg-[#39FF14] text-black rounded-lg font-semibold hover:neon-glow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting || uploadingImages}
+              className="px-8 py-3 bg-gradient-to-r from-[#39FF14] to-green-600 text-black font-semibold rounded-lg hover:from-green-600 hover:to-[#39FF14] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
-              {isSubmitting ? 'Creating...' : uploadingImages ? 'Uploading...' : 'Create Listing'}
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <>
+                  <Package className="w-4 h-4" />
+                  <span>Create Listing</span>
+                </>
+              )}
             </button>
           </div>
         </form>
