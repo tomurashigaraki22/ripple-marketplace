@@ -132,7 +132,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-16 items-center">
             <div className="space-y-8">
               <h3 className="text-3xl font-bold mb-8 bg-gradient-to-r from-[#39FF14] to-emerald-400 bg-clip-text text-transparent">Why Choose RippleBids?</h3>
               
@@ -168,7 +168,7 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-            
+{/*             
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/20 to-emerald-400/20 rounded-3xl blur-xl"></div>
               <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-10 rounded-3xl">
@@ -197,7 +197,7 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </section>
