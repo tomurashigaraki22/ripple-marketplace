@@ -498,7 +498,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
         window.location.href = deepLink;
         
         return {
-          success: true,
+          success: false,
           redirected: true,
           message: 'Redirected to MetaMask mobile app'
         };
