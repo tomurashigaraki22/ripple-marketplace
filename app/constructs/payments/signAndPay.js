@@ -9,6 +9,21 @@ import { ethers } from 'ethers';
 import { Client, Wallet, xrpToDrops } from 'xrpl';
 
 /**
+ * Check if the current environment is a mobile device
+ * @returns {boolean} True if the current environment is a mobile device
+ */
+const isMobile = () =>
+  typeof window !== 'undefined' &&
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+/**
+ * Check if the current environment is the MetaMask browser
+ * @returns {boolean} True if the current environment is the MetaMask browser
+ */
+const isInMetaMaskBrowser = () =>
+  typeof window !== 'undefined' && /MetaMask/i.test(navigator.userAgent);
+
+/**
  * Format error messages to be more user-friendly
  * @param {string|Error} error - The error message or object
  * @returns {string} A user-friendly error message
@@ -444,6 +459,46 @@ export const sendXRPLXRPBPayment = async (wallet, amount) => {
  */
 export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
   try {
+    // Mobile detection and deep link redirection
+    if (isMobile() && !isInMetaMaskBrowser()) {
+      const confirmOpen = window.confirm(
+        "To complete this transaction, you'll be redirected to MetaMask mobile app with the dapp browser. Continue?"
+      );
+
+      if (confirmOpen) {
+        // Create deep link with current page URL for dapp browser
+        const currentUrl = window.location.href;
+        const deepLink = `https://metamask.app.link/dapp/${encodeURIComponent(currentUrl.replace(/^https?:\/\//, ''))}`;
+        
+        console.log('🔗 Redirecting to MetaMask mobile with deep link:', deepLink);
+        
+        // Store payment intent for when user returns
+        const paymentIntent = {
+          type: 'xrpl_evm_xrpb_payment',
+          amount: amount,
+          timestamp: Date.now(),
+          recipient: PAYMENT_RECIPIENTS.xrplEvm
+        };
+        localStorage.setItem('pending_payment_intent', JSON.stringify(paymentIntent));
+        
+        // Redirect to MetaMask mobile
+        window.location.href = deepLink;
+        
+        return {
+          success: true,
+          redirected: true,
+          message: 'Redirected to MetaMask mobile app'
+        };
+      } else {
+        console.log('User declined MetaMask deep link');
+        return {
+          success: false,
+          error: 'Payment cancelled by user'
+        };
+      }
+    }
+
+    // Desktop/MetaMask browser flow continues as before
     if (!getSignerFn) {
       throw new Error('Signer function not provided');
     }
@@ -456,7 +511,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
 
     const fromAddress = await signer.getAddress();
     
-    console.log('🟠 XRPL EVM XRPB PAYMENT INITIATED (TESTNET)');
+    console.log('🟠 XRPL EVM XRPB PAYMENT INITIATED (MAINNET)');
     console.log('From:', fromAddress);
     console.log('To:', PAYMENT_RECIPIENTS.xrplEvm);
     console.log('Amount:', amount, 'XRPB');

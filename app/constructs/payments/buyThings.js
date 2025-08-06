@@ -8,6 +8,13 @@ import {
 import { ethers } from 'ethers';
 import { Client, Wallet, xrpToDrops } from 'xrpl';
 
+const isMobile = () =>
+  typeof window !== 'undefined' &&
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+const isInMetaMaskBrowser = () =>
+  typeof window !== 'undefined' && /MetaMask/i.test(navigator.userAgent);
+
 const formatErrorMessage = (error) => {
   if (!error) return 'An unexpected error occurred. Please try again.';
   
@@ -465,6 +472,46 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
 
     console.log('✅ Validated amount:', validAmount);
 
+    // Mobile detection and deep link redirection
+    if (isMobile() && !isInMetaMaskBrowser()) {
+      const confirmOpen = window.confirm(
+        "To complete this transaction, you'll be redirected to MetaMask mobile app with the dapp browser. Continue?"
+      );
+
+      if (confirmOpen) {
+        // Create deep link with current page URL for dapp browser
+        const currentUrl = window.location.href;
+        const deepLink = `https://metamask.app.link/dapp/${encodeURIComponent(currentUrl.replace(/^https?:\/\//, ''))}`;
+        
+        console.log('🔗 Redirecting to MetaMask mobile with deep link:', deepLink);
+        
+        // Store payment intent for when user returns
+        const paymentIntent = {
+          type: 'xrpl_evm_xrpb_payment',
+          amount: validAmount,
+          timestamp: Date.now(),
+          recipient: PAYMENT_RECIPIENTS.xrplEvm
+        };
+        localStorage.setItem('pending_payment_intent', JSON.stringify(paymentIntent));
+        
+        // Redirect to MetaMask mobile
+        window.location.href = deepLink;
+        
+        return {
+          success: true,
+          redirected: true,
+          message: 'Redirected to MetaMask mobile app'
+        };
+      } else {
+        console.log('User declined MetaMask deep link');
+        return {
+          success: false,
+          error: 'Payment cancelled by user'
+        };
+      }
+    }
+
+    // Desktop/MetaMask browser flow continues as before
     if (!getSignerFn) {
       throw new Error('Signer function not provided');
     }
@@ -479,7 +526,6 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
       signer = await Promise.race([signerPromise, timeoutPromise]);
     } catch (signerError) {
       console.error('Signer error:', signerError);
-      alert(`SIGNER: ${signerError}`)
       throw new Error('Failed to get wallet signer. Please reconnect your wallet and try again.');
     }
     
@@ -523,7 +569,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
         throw new Error('Invalid amount format');
       }
 
-      const decimals = 18;
+      const decimals = XRPB_TOKENS.xrplEvm.decimals;
       if (!Number.isInteger(decimals) || decimals < 0 || decimals > 77) {
         throw new Error('Invalid token decimals');
       }
@@ -566,83 +612,33 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
       
       // More specific error for BigNumber issues
       if (parseError.message.includes('invalid BigNumber') || parseError.message.includes('BigNumberish')) {
-        throw new Error(`Invalid payment amount format. Amount: ${validAmount}. Please try again with a valid number.`);
+        throw new Error(`Invalid payment amount format. Please refresh the page and try again. Error: ${parseError.message}`);
       }
       
-      throw new Error(`Failed to process payment amount: ${parseError.message}. Please refresh and try again.`);
+      throw new Error(`Failed to process payment amount: ${parseError.message}`);
     }
     
-    // Additional validation before transfer
-    if (!tokenAmount || tokenAmount.toString() === '0') {
-      throw new Error('Token amount calculation failed. Please refresh and try again.');
+    // Final validation before transfer
+    if (!tokenAmount || tokenAmount === null || tokenAmount === undefined) {
+      throw new Error('Token amount is null after processing. Please refresh and try again.');
     }
     
-    console.log('📝 XRPB Transfer prepared:', {
-      contract: XRPB_TOKENS.xrplEvm.address,
-      to: PAYMENT_RECIPIENTS.xrplEvm,
-      amount: tokenAmount.toString(),
-      originalAmount: validAmount
-    });
+    if (tokenAmount <= 0n) {
+      throw new Error('Token amount must be greater than zero.');
+    }
     
-    // Send XRPB transfer transaction with additional validation
+    console.log('🚀 Executing transfer with tokenAmount:', tokenAmount.toString());
+    
     let txResponse;
+    
     try {
-      // FINAL CHECK: Ensure tokenAmount is valid before transfer
-      if (!tokenAmount || typeof tokenAmount.toString !== 'function') {
-        throw new Error('Invalid token amount object');
-      }
-      
-      console.log('🚀 Executing transfer with tokenAmount:', tokenAmount.toString());
-      
-      // Mobile-specific transaction options
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      let transferOptions = {};
-      
-      if (isMobile) {
-        console.log('📱 Mobile device detected, using mobile-optimized settings');
-        
-        // For mobile, we need to be more explicit with gas settings
-        try {
-          // Estimate gas first
-          const gasEstimate = await xrpbContract.transfer.estimateGas(
-            PAYMENT_RECIPIENTS.xrplEvm,
-            tokenAmount
-          );
-          
-          console.log('⛽ Gas estimate:', gasEstimate.toString());
-          
-          // Add 20% buffer for mobile
-          const gasLimit = (gasEstimate * BigInt(120)) / BigInt(100);
-          
-          transferOptions = {
-            gasLimit: gasLimit,
-            // Let the wallet handle gas price on mobile
-          };
-          
-          console.log('📱 Mobile transfer options:', transferOptions);
-          
-        } catch (gasError) {
-          console.warn('⚠️ Gas estimation failed, proceeding without explicit gas limit:', gasError);
-          // Continue without gas limit - let mobile wallet handle it
-        }
-      }
-      
       console.log('🚀 Executing transfer...');
       
-      // Execute transfer with mobile-specific options
-      if (Object.keys(transferOptions).length > 0) {
-        txResponse = await xrpbContract.transfer(
-          PAYMENT_RECIPIENTS.xrplEvm,
-          tokenAmount,
-          transferOptions
-        );
-      } else {
-        txResponse = await xrpbContract.transfer(
-          PAYMENT_RECIPIENTS.xrplEvm,
-          tokenAmount
-        );
-      }
+      // Execute transfer
+      txResponse = await xrpbContract.transfer(
+        PAYMENT_RECIPIENTS.xrplEvm,
+        tokenAmount
+      );
       
       console.log('✅ Transfer initiated successfully:', txResponse.hash);
       
@@ -651,89 +647,80 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
       
       const errorMessage = transferError.message || transferError.toString();
       
-      // Handle the specific BigNumberish error
-      if (errorMessage.includes('invalid BigNumber') || errorMessage.includes('BigNumberish')) {
-        console.error('🔍 BigNumberish error details:', {
-          tokenAmount: tokenAmount?.toString(),
+      // Handle BigNumberish errors specifically
+      if (errorMessage.includes('BigNumberish') || errorMessage.includes('invalid BigNumber')) {
+        console.error('❌ BigNumberish error details:', {
+          tokenAmount: tokenAmount ? tokenAmount.toString() : 'null',
           validAmount,
           decimals: XRPB_TOKENS.xrplEvm.decimals,
           recipient: PAYMENT_RECIPIENTS.xrplEvm
         });
-        throw new Error('Transaction amount is invalid. This may be due to a mobile browser issue. Please try refreshing the page or using a desktop browser.');
+        
+        if (isMobile()) {
+          throw new Error('Mobile payment processing error. Please try using MetaMask mobile app directly or switch to desktop.');
+        } else {
+          throw new Error('Payment amount processing error. Please refresh the page and try again.');
+        }
       }
       
+      // Handle insufficient funds
       if (errorMessage.includes('insufficient funds') || errorMessage.includes('insufficient balance')) {
-        throw new Error('Insufficient XRPB balance in your wallet.');
+        throw new Error('Insufficient XRPB balance. Please ensure you have enough XRPB tokens and ETH for gas fees.');
       }
       
-      if (errorMessage.includes('user rejected') || errorMessage.includes('user denied')) {
-        throw new Error('Transaction was cancelled by user.');
-      }
-      
-      if (errorMessage.includes('gas') || errorMessage.includes('out of gas')) {
-        throw new Error('Transaction failed due to gas issues. Please try again.');
-      }
-      
-      if (errorMessage.includes('network') || errorMessage.includes('connection')) {
-        throw new Error('Network connection issue. Please check your connection and try again.');
-      }
-      
-      if (errorMessage.includes('nonce')) {
-        throw new Error('Transaction nonce error. Please refresh and try again.');
-      }
-      
-      // Mobile-specific errors
-      if (errorMessage.includes('missing revert data') || errorMessage.includes('call_exception')) {
-        throw new Error('Transaction failed on mobile. Please ensure you have sufficient XRPB balance and network connection.');
-      }
-      
-      // Generic mobile-friendly error
-      throw new Error(`Transaction failed: ${formatErrorMessage(errorMessage)}. If this persists on mobile, try using a desktop browser.`);
+      throw new Error(formatErrorMessage(errorMessage));
     }
     
-    console.log('⏳ XRPB transfer sent, waiting for confirmation...');
-    console.log('Transaction Hash:', txResponse.hash);
-    alert(`XRPB Transfer sent: `)
-    
-    // Wait for confirmation with timeout
+    // Wait for confirmation with mobile timeout
     let receipt;
     try {
-      const receiptPromise = txResponse.wait();
+      console.log('⏳ Waiting for transaction confirmation...');
+      const timeoutMs = isMobile() ? 60000 : 30000; // Longer timeout for mobile
+      
+      const confirmationPromise = txResponse.wait();
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction confirmation timeout')), 60000)
+        setTimeout(() => reject(new Error('Transaction confirmation timeout')), timeoutMs)
       );
-      receipt = await Promise.race([receiptPromise, timeoutPromise]);
+      
+      receipt = await Promise.race([confirmationPromise, timeoutPromise]);
+      
     } catch (confirmError) {
-      console.error('Confirmation error:', confirmError);
-      // Transaction might still succeed, so we'll return partial success
-      const paymentData = {
-        blockchain: 'XRPL_EVM',
-        token: 'XRPB',
-        from: fromAddress,
-        to: PAYMENT_RECIPIENTS.xrplEvm,
-        amount: validAmount,
-        txHash: txResponse.hash,
-        timestamp: new Date().toISOString(),
-        explorerUrl: `https://explorer.xrplevm.org/tx/${txResponse.hash}`,
-        network: 'mainnet',
-        status: 'pending'
-      };
+      console.error('⚠️ Confirmation error:', confirmError);
       
-      localStorage.setItem(`xrpl_evm_xrpb_payment_${txResponse.hash}`, JSON.stringify(paymentData));
+      if (confirmError.message.includes('timeout')) {
+        console.log('🔄 Transaction may still be processing...');
+        // Return success but note the timeout
+        const paymentData = {
+          blockchain: 'XRPL_EVM',
+          token: 'XRPB',
+          from: fromAddress,
+          to: PAYMENT_RECIPIENTS.xrplEvm,
+          amount: validAmount,
+          txHash: txResponse.hash,
+          timestamp: new Date().toISOString(),
+          explorerUrl: `https://explorer.xrplevm.org/tx/${txResponse.hash}`,
+          network: 'mainnet',
+          status: 'pending_confirmation'
+        };
+        
+        localStorage.setItem(`xrpl_evm_xrpb_payment_${txResponse.hash}`, JSON.stringify(paymentData));
+        
+        return { 
+          success: true, 
+          txHash: txResponse.hash, 
+          paymentData,
+          warning: 'Transaction sent but confirmation timed out. Please check the explorer link to verify completion.'
+        };
+      }
       
-      return { 
-        success: true, 
-        txHash: txResponse.hash, 
-        paymentData,
-        warning: 'Transaction sent but confirmation timed out. Please check the explorer link to verify completion.'
-      };
+      throw confirmError;
     }
     
     console.log('✅ XRPL EVM XRPB Payment Successful!');
     console.log('Transaction Hash:', txResponse.hash);
     console.log('Block Number:', receipt.blockNumber);
     console.log('Gas Used:', receipt.gasUsed.toString());
-    console.log('View on XRPL EVM Mainnet Explorer:', `https://explorer.xrplevm.org/tx/${txResponse.hash}`);
+    console.log('View on XRPL EVM Explorer:', `https://explorer.xrplevm.org/tx/${txResponse.hash}`);
     
     const paymentData = {
       blockchain: 'XRPL_EVM',
@@ -756,7 +743,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
     
   } catch (error) {
     console.error('❌ XRPL EVM XRPB Payment Failed:', error);
-    return { success: false, error: formatErrorMessage(error.message) };
+    return { success: false, error: error.message };
   }
 };
 

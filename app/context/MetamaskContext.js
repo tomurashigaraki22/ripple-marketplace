@@ -42,45 +42,11 @@ const isMobile = () => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
-// Simplified Wagmi configuration - improved mobile support
+// Simplified Wagmi configuration - only injected connector
 const config = createConfig({
   chains: [xrplEvmTestnet],
   connectors: [
     metaMask(),
-    walletConnect({
-      projectId: '7f999d777dd494df9a3038f609665cea',
-      metadata: {
-        name: 'RippleBids',
-        description: 'Decentralized Commerce',
-        url: 'https://ripplebids.com',
-        icons: ['https://ripplebids.com/logo.jpg'], // Use your actual logo
-      },
-      showQrModal: true, // Always show QR modal
-      qrModalOptions: {
-        themeMode: 'light',
-        themeVariables: {
-          '--wcm-z-index': '1000'
-        },
-        mobileLinks: [
-          'metamask',
-          'trust',
-          'rainbow',
-          'coinbase',
-          'argent',
-          'imtoken',
-          'pillar'
-        ],
-        desktopLinks: [
-          'metamask',
-          'trust',
-          'rainbow',
-          'coinbase'
-        ],
-        walletImages: {
-          metamask: 'https://avatars.githubusercontent.com/u/11744586?s=280&v=4'
-        }
-      },
-    }),
   ],
   transports: {
     [xrplEvmTestnet.id]: http(),
@@ -108,50 +74,17 @@ const MetamaskProviderInner = ({ children }) => {
 
 const connectMetamaskWallet = async () => {
   try {
-    console.log('Available connectors:', connectors.map((c) => ({ id: c.id, name: c.name })));
-    
-    // For mobile, prefer WalletConnect, for desktop prefer MetaMask
-    const preferredConnector = isMobile()
-      ? connectors.find((c) => c.id === 'walletConnect') || connectors.find((c) => c.id === 'metaMask')
-      : connectors.find((c) => c.id === 'metaMask') || connectors.find((c) => c.id === 'walletConnect');
+    alert(`Connectors: ${connectors.map((c) => c.id)}`)
+    const preferredConnector = connectors.find((c) => c.id === 'metaMaskSDK');
 
     if (!preferredConnector) {
-      throw new Error('No suitable wallet connector found. Please install MetaMask or a WalletConnect compatible wallet.');
+      throw new Error('No suitable connector found');
     }
 
-    console.log('Using connector:', preferredConnector.id);
-    
-    // Add timeout for mobile connections
-    const connectPromise = connect({ connector: preferredConnector });
-    
-    if (isMobile()) {
-      // 30 second timeout for mobile
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout. Please try again.')), 30000)
-      );
-      
-      await Promise.race([connectPromise, timeoutPromise]);
-    } else {
-      await connectPromise;
-    }
-    
+    connect({ connector: preferredConnector });
   } catch (error) {
     console.error("Connection error:", error);
-    
-    // More specific error messages
-    let errorMessage = 'Failed to connect wallet';
-    
-    if (error.message?.includes('timeout')) {
-      errorMessage = 'Connection timed out. Please ensure your wallet app is open and try again.';
-    } else if (error.message?.includes('rejected')) {
-      errorMessage = 'Connection was rejected. Please approve the connection in your wallet.';
-    } else if (error.message?.includes('No suitable')) {
-      errorMessage = error.message;
-    } else {
-      errorMessage = `Connection failed: ${error.message || 'Unknown error'}`;
-    }
-    
-    alert(errorMessage);
+    alert(`Failed to connect wallet: ${error.message || error}`);
     throw error;
   }
 };
