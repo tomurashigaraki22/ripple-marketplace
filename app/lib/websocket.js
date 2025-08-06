@@ -53,7 +53,6 @@ export function initializeWebSocket(server) {
 
       } catch (error) {
         alert(`Error joining room: ${error.message}`);
-        socket.emit('error', 'Failed to join conversation');
       }
     });
 
