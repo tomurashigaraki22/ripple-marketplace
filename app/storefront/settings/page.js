@@ -5,6 +5,11 @@ import StorefrontLayout from "../components/StorefrontLayout"
 import { useAuth } from "../../context/AuthContext"
 
 export default function StorefrontSettings() {
+  useEffect(() => {
+    console.log(
+    "main"
+    )
+  }, [])
   const { user } = useAuth()
   const [settings, setSettings] = useState({
     // Account Preferences
