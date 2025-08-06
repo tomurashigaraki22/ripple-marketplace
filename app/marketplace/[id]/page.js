@@ -1,8 +1,9 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import Image from "next/image"
-import { Heart, Share2, Flag, Clock, Users, Truck, Package, Wallet, CreditCard, MapPin, Shield, DollarSign, Loader2 } from "lucide-react"
+import { Heart, Share2, Flag, Clock, Users, Truck, Package, Wallet, CreditCard, MapPin, Shield, DollarSign, Loader2, Store } from "lucide-react"
 import { useXRPL } from '../../context/XRPLContext'
 import { useMetamask } from '../../context/MetamaskContext'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
@@ -1064,7 +1065,18 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                 </div>
                 <div className="text-right">
                   <p className="text-gray-400 text-sm">Seller</p>
-                  <p className="text-white font-semibold">@{listing.seller.username}</p>
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-white font-semibold">@{listing.seller.username}</p>
+                    </div>
+                    <Link 
+                      href={`/storefront/public/${listing.seller.id}`}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-[#39FF14]/10 hover:bg-[#39FF14]/20 border border-[#39FF14]/30 hover:border-[#39FF14]/50 rounded-lg text-[#39FF14] hover:text-[#39FF14] transition-all duration-300 text-sm font-medium"
+                    >
+                      <Store className="w-4 h-4" />
+                      Visit Storefront
+                    </Link>
+                  </div>
                 </div>
               </div>
 
