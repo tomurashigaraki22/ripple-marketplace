@@ -161,6 +161,30 @@ export async function initializeDatabase() {
       )
     `;
 
+    // Messages table for buyer-seller communication
+    const createMessagesTable = `
+      CREATE TABLE IF NOT EXISTS messages (
+        id VARCHAR(36) PRIMARY KEY,
+        room_id VARCHAR(36) NOT NULL COMMENT 'Same as order_id',
+        order_id VARCHAR(36) NOT NULL,
+        buyer_id VARCHAR(36) NOT NULL,
+        seller_id VARCHAR(36) NOT NULL,
+        message TEXT,
+        image_url VARCHAR(500),
+        sent_by ENUM('buyer', 'seller') NOT NULL,
+        reported BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_room_id (room_id),
+        INDEX idx_order_id (order_id),
+        INDEX idx_created_at (created_at),
+        INDEX idx_sent_by (sent_by)
+      )
+    `;
+
     // Create tables in order (dependencies first)
     await db.query(createRolesTable);
     await db.query(createMembershipTiersTable);
@@ -171,6 +195,7 @@ export async function initializeDatabase() {
     await db.query(createUserMembershipsTable);
     await db.query(createEscrowsTable);
     await db.query(createNotificationsTable);
+    await db.query(createMessagesTable);
 
     // Insert default roles (admin first - highest role)
     const insertDefaultRoles = `

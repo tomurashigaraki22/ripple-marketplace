@@ -1,7 +1,8 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Search, Package, DollarSign, Calendar, User, Truck, CheckCircle, Edit3, Eye, MapPin, Phone, Mail } from "lucide-react"
+import { Search, Package, DollarSign, Calendar, User, Truck, CheckCircle, Edit3, Eye, MapPin, Phone, Mail, MessageCircle } from "lucide-react"
 import StorefrontLayout from "../components/StorefrontLayout"
+import MessageCenter from "../../components/messaging/MessageCenter"
 
 export default function StorefrontOrders() {
   const [orders, setOrders] = useState([])
@@ -10,12 +11,26 @@ export default function StorefrontOrders() {
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [showShippingModal, setShowShippingModal] = useState(false)
+  const [showChatModal, setShowChatModal] = useState(false)
+  const [selectedChatOrder, setSelectedChatOrder] = useState(null)
   const [shippingData, setShippingData] = useState({
     tracking_number: '',
     shipping_carrier: '',
     shipping_notes: ''
   })
   const [updating, setUpdating] = useState(false)
+
+  // ... existing code ...
+
+  const handleOpenChat = (order) => {
+    setSelectedChatOrder(order)
+    setShowChatModal(true)
+  }
+
+  const handleCloseChat = () => {
+    setShowChatModal(false)
+    setSelectedChatOrder(null)
+  }
 
   useEffect(() => {
     fetchOrders()
@@ -321,6 +336,15 @@ export default function StorefrontOrders() {
                   
                   {/* Actions */}
                   <div className="flex flex-col space-y-2">
+                    {/* Chat Button - Always available for communication */}
+                    <button
+                      onClick={() => handleOpenChat(order)}
+                      className="bg-purple-500/10 text-purple-400 px-4 py-2 rounded-lg hover:bg-purple-500/20 transition-all duration-300 flex items-center space-x-2"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Chat with Buyer</span>
+                    </button>
+                    
                     {(order.status === 'paid' || order.status === 'escrow_funded') && (
                       <button
                         onClick={() => handleShippingUpdate(order)}
@@ -361,6 +385,42 @@ export default function StorefrontOrders() {
           </div>
         )}
       </div>
+
+      {/* Chat Modal */}
+      {showChatModal && selectedChatOrder && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-4xl h-[80vh] flex flex-col">
+            {/* Chat Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  Chat with {selectedChatOrder.buyer_username}
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Order #{selectedChatOrder.id.substring(0, 8)} - {selectedChatOrder.listing_title}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseChat}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Chat Content */}
+            <div className="flex-1 overflow-hidden">
+              <MessageCenter 
+                orderId={selectedChatOrder.id}
+                userType="seller"
+                onClose={handleCloseChat}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Shipping Modal */}
       {showShippingModal && (

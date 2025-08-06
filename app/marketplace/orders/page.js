@@ -7,6 +7,9 @@ import { useXRPL } from "../../context/XRPLContext"
 import { useMetamask } from "../../context/MetamaskContext"
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { useAuth } from "@/app/context/AuthContext"
+import MessageCenter from '../../components/messaging/MessageCenter'
+import { X } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 
 export default function MyOrdersPage() {
   const [orders, setOrders] = useState([])
@@ -16,6 +19,7 @@ export default function MyOrdersPage() {
   const [pagination, setPagination] = useState({ page: 1, totalPages: 0, total: 0 })
   const [connectedWallets, setConnectedWallets] = useState([])
   const [confirmingOrder, setConfirmingOrder] = useState(null)
+  const [selectedOrderForChat, setSelectedOrderForChat] = useState(null)
 
   // Wallet contexts
   const { xrpWalletAddress } = useXRPL()
@@ -160,7 +164,7 @@ const fetchOrders = async () => {
         alert('Order confirmed as received successfully!')
       } else {
         const error = await response.json()
-        alert(`Error: ${error.message}`)
+        alert(`Failed to confirm order: ${error.error}`)
       }
     } catch (error) {
       console.error('Error confirming order received:', error)
@@ -299,6 +303,39 @@ const fetchOrders = async () => {
           </div>
         </div>
 
+        {/* Chat Modal */}
+        {selectedOrderForChat && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-black/95 border border-gray-800 rounded-xl sm:rounded-2xl w-full max-w-6xl h-[95vh] sm:h-[85vh] flex flex-col shadow-2xl">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-800 flex-shrink-0">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-semibold text-white truncate">
+                    Chat - Order #{selectedOrderForChat.id.slice(0, 8)}...
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-400 truncate">
+                    {selectedOrderForChat.listing_title}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedOrderForChat(null)}
+                  className="p-2 text-gray-400 hover:text-white transition-colors flex-shrink-0 ml-2"
+                >
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+              
+              {/* MessageCenter Container */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <MessageCenter 
+                  orderId={selectedOrderForChat.id}
+                  userType={user.id === selectedOrderForChat.buyer_id ? 'buyer' : 'seller'}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Orders List */}
         {loading ? (
           <div className="flex justify-center items-center py-20">
@@ -399,6 +436,15 @@ const fetchOrders = async () => {
                             <Eye className="w-4 h-4" />
                             <span>View Item</span>
                           </Link>
+
+                          {/* Chat Button */}
+                          <button
+                            onClick={() => setSelectedOrderForChat(order)}
+                            className="inline-flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600/80 text-white rounded-lg hover:bg-blue-600 transition-colors duration-300 text-sm"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>Chat</span>
+                          </button>
 
                           {order.status === 'shipped' && (
                             <button
