@@ -74,7 +74,6 @@ const MetamaskProviderInner = ({ children }) => {
 
 const connectMetamaskWallet = async () => {
   try {
-    alert(`Connectors: ${connectors.map((c) => c.id)}`)
     const preferredConnector = connectors.find((c) => c.id === 'metaMaskSDK');
 
     if (!preferredConnector) {
@@ -159,7 +158,6 @@ const getSigner = async () => {
     const provider = new ethers.BrowserProvider(walletClient);
     signer = await provider.getSigner();
   }
-  alert(`Signer: ${signer}`)
   return signer;
 };
 

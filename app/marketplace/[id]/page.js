@@ -413,7 +413,6 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
         }
         
         xrpbAmount = getPaymentAmountForWallet(listingPrice, chainType);
-        alert(`XRPB MOU ${xrpbAmount} ${listingPrice}`)
         
         // Final validation before payment
         if (!xrpbAmount || xrpbAmount <= 0 || isNaN(xrpbAmount) || !Number.isFinite(xrpbAmount)) {
@@ -432,7 +431,6 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
       if (chainType === 'xrp') {
         walletForPayment = xrplWallet
       } else if (chainType === 'evm') {
-        alert(`EVM: ${primaryWallet.type}`)
         walletForPayment = getSigner
       } else if (chainType === 'solana') {
         walletForPayment = {
@@ -464,7 +462,6 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
           paymentResult = await sendXRPLXRPBPayment(walletForPayment, xrpbAmount);
           break;
         case 'xrpl_evm':
-          alert(`This is ht xrpl_evm`)
           if (!walletForPayment) {
             throw new Error('XRPL EVM signer function not provided');
           }
@@ -476,6 +473,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
 
       if (!paymentResult.success) {
         throw new Error(paymentResult.error || 'Payment failed');
+        return
       }
 
       console.log('✅ Payment successful! Transaction:', paymentResult.signature || paymentResult.txHash)
