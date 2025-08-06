@@ -26,7 +26,6 @@ export function initializeWebSocket(server) {
           [order_id, user_id, user_id]
         );
 
-        if (orders.length > 0) {
           socket.join(order_id);
           socket.user_id = user_id;
           socket.user_type = user_type;
@@ -51,9 +50,7 @@ export function initializeWebSocket(server) {
           );
           
           socket.emit('recent_messages', messages);
-        } else {
-          socket.emit('error', 'Unauthorized access to this conversation');
-        }
+
       } catch (error) {
         console.error('Error joining room:', error);
         socket.emit('error', 'Failed to join conversation');
