@@ -8,6 +8,49 @@ import {
 import { ethers } from 'ethers';
 import { Client, Wallet, xrpToDrops } from 'xrpl';
 
+const formatErrorMessage = (error) => {
+  if (!error) return 'An unexpected error occurred. Please try again.';
+  
+  const errorStr = error.toLowerCase();
+  
+  // Handle specific error types
+  if (errorStr.includes('missing revert data') || errorStr.includes('call_exception')) {
+    return 'Transaction failed. This could be due to insufficient balance, network issues, or gas problems. Please check your wallet balance and try again.';
+  }
+  
+  if (errorStr.includes('insufficient funds') || errorStr.includes('insufficient balance')) {
+    return 'Insufficient funds in your wallet. Please add more funds and try again.';
+  }
+  
+  if (errorStr.includes('user rejected') || errorStr.includes('user denied')) {
+    return 'Transaction was cancelled by user.';
+  }
+  
+  if (errorStr.includes('network') || errorStr.includes('connection')) {
+    return 'Network connection issue. Please check your internet connection and try again.';
+  }
+  
+  if (errorStr.includes('gas') || errorStr.includes('out of gas')) {
+    return 'Transaction failed due to gas issues. Please try again with higher gas settings.';
+  }
+  
+  if (errorStr.includes('nonce')) {
+    return 'Transaction nonce error. Please refresh the page and try again.';
+  }
+  
+  if (errorStr.includes('timeout')) {
+    return 'Transaction timed out. Please try again.';
+  }
+  
+  // For any other technical errors, provide a generic user-friendly message
+  if (error.length > 100 || errorStr.includes('0x') || errorStr.includes('revert')) {
+    return 'Transaction failed due to a technical issue. Please try again or contact support if the problem persists.';
+  }
+  
+  // Return the original error if it's already user-friendly
+  return error;
+};
+
 // XRPL EVM RPC URL
 const RPC_URL = "https://rpc.xrplevm.org";
 
@@ -473,7 +516,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
     
   } catch (error) {
     console.error('❌ XRPL EVM XRPB Payment Failed:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: formatErrorMessage(error.message) };
   }
 };
 
@@ -937,16 +980,40 @@ export const getXRPBPriceFromXRPL = async () => {
  * Get XRPB price from XRPL EVM - simplified without CoinGecko
  */
 export const getXRPBPriceFromXRPLEVM = async () => {
-  try {
-    // Since your API doesn't provide XRPL EVM prices, we'll use a simple fallback
-    // You can replace this with your own XRPL EVM price source if available
-    console.log('⚠️ XRPL EVM price not available from new API, using fallback');
-    return 0.0001; // Simple fallback value
-  } catch (error) {
-    console.error('❌ Error fetching XRPB price from XRPL EVM:', error);
-    return null;
-  }
-};
+      try {
+        console.log('🔄 Fetching XRPB price from XRiSE33 API...');
+        
+        const response = await fetch('https://api.xrise33.com/tokens?limit=1&page=10');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Extract the XRPB token data
+        if (data.data && data.data.length > 0) {
+          const xrpbToken = data.data[0];
+          
+          // Verify this is the correct XRPB token
+          if (xrpbToken.symbol === 'XRPB' && xrpbToken.address.toLowerCase() === '0x6d8630d167458b337a2c8b6242c354d2f4f75d96') {
+            const usdPrice = parseFloat(xrpbToken.usdPerToken);
+            console.log(`✅ XRPB Price from XRiSE33: $${usdPrice}`);
+            return usdPrice;
+          } else {
+            throw new Error('XRPB token not found in API response');
+          }
+        } else {
+          throw new Error('No token data found in API response');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching XRPB price from XRiSE33 API:', error);
+        // Fallback to previous method or return null
+        console.log('⚠️ Falling back to previous price calculation method...');
+        return null;
+      }
+    };
+
 
 /**
  * Get all XRPB prices from different chains using individual API calls only

@@ -13,10 +13,53 @@ import { useAuth } from '../context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { getXRPBPriceInUSDEnhanced, getXRPBPriceFromGeckoTerminal } from '../constructs/payments/signAndPay';
 
+const formatErrorMessage = (error) => {
+  if (!error) return 'An unexpected error occurred. Please try again.';
+  
+  const errorStr = error.toLowerCase();
+  
+  // Handle specific error types
+  if (errorStr.includes('missing revert data') || errorStr.includes('call_exception')) {
+    return 'Transaction failed. This could be due to insufficient balance, network issues, or gas problems. Please check your wallet balance and try again.';
+  }
+  
+  if (errorStr.includes('insufficient funds') || errorStr.includes('insufficient balance')) {
+    return 'Insufficient funds in your wallet. Please add more funds and try again.';
+  }
+  
+  if (errorStr.includes('user rejected') || errorStr.includes('user denied')) {
+    return 'Transaction was cancelled by user.';
+  }
+  
+  if (errorStr.includes('network') || errorStr.includes('connection')) {
+    return 'Network connection issue. Please check your internet connection and try again.';
+  }
+  
+  if (errorStr.includes('gas') || errorStr.includes('out of gas')) {
+    return 'Transaction failed due to gas issues. Please try again with higher gas settings.';
+  }
+  
+  if (errorStr.includes('nonce')) {
+    return 'Transaction nonce error. Please refresh the page and try again.';
+  }
+  
+  if (errorStr.includes('timeout')) {
+    return 'Transaction timed out. Please try again.';
+  }
+  
+  // For any other technical errors, provide a generic user-friendly message
+  if (error.length > 100 || errorStr.includes('0x') || errorStr.includes('revert')) {
+    return 'Transaction failed due to a technical issue. Please try again or contact support if the problem persists.';
+  }
+  
+  // Return the original error if it's already user-friendly
+  return error;
+};
+
 export default function MembershipPage() {
   // Wallet contexts
   const { xrpWalletAddress, xrplWallet, xrpbBalance, setupXRPBTrustline, checkXRPBTrustline } = useXRPL()
-  const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner, switchToXRPLEVM } = useMetamask()
+  const { metamaskWalletAddress, isConnected: metamaskConnected, isXRPLEVM, getSigner, switchToXRPLEVM, currentChain } = useMetamask()
   const { publicKey, connected: solanaConnected, wallet, sendTransaction, signTransaction, signAllTransactions } = useWallet()
   const { connection } = useConnection()
   const [xrpbPrices, setXrpbPrices] = useState({
@@ -136,6 +179,10 @@ export default function MembershipPage() {
   }, [xrpWalletAddress])
   
   // Handle trustline setup
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [trustlineQRCode, setTrustlineQRCode] = useState(null)
+  const [trustlinePayloadId, setTrustlinePayloadId] = useState(null)
+  
   const handleSetupTrustline = async () => {
     setIsSettingUpTrustline(true)
     setTrustlineResult(null)
@@ -145,7 +192,26 @@ export default function MembershipPage() {
       setTrustlineResult(result)
       
       if (result.success) {
-        setHasTrustline(true)
+        // Show QR code modal or component
+        setTrustlineQRCode(result.qrCode)
+        setTrustlinePayloadId(result.payloadId)
+        setShowQRModal(true)
+        
+        // Optional: Set up websocket to listen for completion
+        if (result.websocketUrl) {
+          const ws = new WebSocket(result.websocketUrl)
+          ws.onmessage = (event) => {
+            const data = JSON.parse(event.data)
+            if (data.signed === true) {
+              // Trustline was successfully set up
+              setShowQRModal(false)
+              setHasTrustline(true)
+              // Refresh balances or update UI
+            }
+          }
+        } else {
+          setHasTrustline(true)
+        }
       }
     } catch (error) {
       setTrustlineResult({
@@ -179,7 +245,7 @@ export default function MembershipPage() {
         icon: '🦊',
         currency: 'XRPB',
         network: isXRPLEVM ? 'XRPL EVM Mainnet' : 'Wrong Network',
-        needsSwitch: !isXRPLEVM
+        needsSwitch: !isXRPLEVM  // <-- HERE!
       })
     }
     if (solanaConnected && publicKey) {
@@ -429,6 +495,7 @@ export default function MembershipPage() {
       router.push("/login")
       return
     }
+    console.log("Current: ", currentChain)
 
     setIsProcessing(true);
     setPaymentResult(null);
@@ -440,6 +507,7 @@ export default function MembershipPage() {
 
       // Check if wallet needs network switch
       if (paymentMethod.needsSwitch) {
+        console.log("Paymentmethod: ", paymentMethod)
         await switchToXRPLEVM()
         setPaymentResult({
           success: false,
@@ -606,7 +674,7 @@ export default function MembershipPage() {
       })
       setPaymentResult({
         success: false,
-        error: error.message
+        error: formatErrorMessage(error.message) // Format the error here
       })
     } finally {
       setIsProcessing(false)
@@ -652,83 +720,7 @@ export default function MembershipPage() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/10 to-emerald-400/10 rounded-3xl blur-xl"></div>
               <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-8 rounded-3xl">
-              
-              {/* XRPB Trustline Setup Section */}
-              {xrpWalletAddress && (
-                <div className="max-w-4xl mx-auto mb-8">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#39FF14]/10 to-emerald-400/10 rounded-3xl blur-xl"></div>
-                    <div className="relative bg-black/60 backdrop-blur-xl border border-[#39FF14]/30 p-8 rounded-3xl">
-                      <div className="text-center">
-                        <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent flex items-center justify-center">
-                          <Wallet className="w-6 h-6 text-[#39FF14] mr-3" />
-                          XRPB Token Setup
-                        </h3>
-                        
-                        {!hasTrustline ? (
-                          <div className="space-y-4">
-                            <p className="text-gray-300 mb-6">
-                              To receive and hold XRPB tokens on XRPL, you need to establish a trustline first.
-                            </p>
-                            
-                            <button
-                              onClick={handleSetupTrustline}
-                              disabled={isSettingUpTrustline}
-                              className="bg-gradient-to-r from-[#39FF14] to-emerald-400 text-black px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_40px_rgba(57,255,20,0.6)] transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mx-auto"
-                            >
-                              {isSettingUpTrustline ? (
-                                <>
-                                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                  Setting up Trustline...
-                                </>
-                              ) : (
-                                <>
-                                  <Zap className="w-5 h-5 mr-2" />
-                                  Setup XRPB Trustline
-                                </>
-                              )}
-                            </button>
-                            
-                            <div className="text-sm text-gray-400 space-y-2">
-                              <p>• This will open XAMAN app for you to sign the trustline transaction</p>
-                              <p>• Small network fee (~0.00001 XRP) required</p>
-                              <p>• One-time setup required to hold XRPB tokens</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center space-x-3 text-[#39FF14]">
-                            <CheckCircle className="w-6 h-6" />
-                            <span className="font-semibold">XRPB Trustline Active</span>
-                          </div>
-                        )}
-                        
-                        {/* Trustline Result Display */}
-                        {trustlineResult && (
-                          <div className={`mt-6 p-4 rounded-xl border ${
-                            trustlineResult.success 
-                              ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                              : 'bg-red-500/10 border-red-500/30 text-red-400'
-                          }`}>
-                            <div className="flex items-center justify-center space-x-2">
-                              {trustlineResult.success ? (
-                                <CheckCircle className="w-5 h-5" />
-                              ) : (
-                                <AlertCircle className="w-5 h-5" />
-                              )}
-                              <span className="font-medium">{trustlineResult.message}</span>
-                            </div>
-                            {trustlineResult.txHash && (
-                              <p className="text-sm mt-2 opacity-80">
-                                Transaction: {trustlineResult.txHash}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+
                 <div className="text-center mb-8">
                   <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-white to-[#39FF14] bg-clip-text text-transparent flex items-center justify-center">
                     <TrendingUp className="w-8 h-8 text-[#39FF14] mr-3" />
@@ -1011,6 +1003,35 @@ export default function MembershipPage() {
           )}
         </div>
       </div>
+
+      {/* QR Code Modal Component */}
+      {showQRModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-black/90 backdrop-blur-xl border border-[#39FF14]/30 rounded-3xl p-8 max-w-md w-full">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white">Scan with XAMAN</h3>
+              <button 
+                onClick={() => setShowQRModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex justify-center mb-6 bg-white p-4 rounded-xl">
+              <img src={trustlineQRCode} alt="XAMAN QR Code" className="w-64 h-64" />
+            </div>
+            <p className="text-sm text-gray-300 text-center mb-6">
+              Scan this QR code with your XAMAN app to set up the XRPB trustline
+            </p>
+            <button 
+              onClick={() => setShowQRModal(false)}
+              className="w-full py-4 bg-gradient-to-r from-[#39FF14]/20 to-emerald-400/20 border border-[#39FF14]/30 rounded-xl text-[#39FF14] hover:shadow-[0_0_20px_rgba(57,255,20,0.3)] transition-all duration-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Payment Modal */}
       {showPaymentModal && (

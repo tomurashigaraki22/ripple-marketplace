@@ -65,8 +65,8 @@ const MetamaskProviderInner = ({ children }) => {
 
   // Auto-switch to XRPL EVM when connected but on wrong network
   useEffect(() => {
-    if (isConnected && address && chain && chain.id !== 14440000) {
-      console.log('Connected to wrong network, switching to XRPL EVM testnet...');
+    if (isConnected && address && chain && chain.id !== 1440000) {
+      console.log('Connected to wrong network, switching to XRPL EVM testnet...: ', chain.id);
       switchToXRPLEVM();
     }
   }, [isConnected, address, chain]);
@@ -94,6 +94,7 @@ const MetamaskProviderInner = ({ children }) => {
   const switchToXRPLEVM = async () => {
     try {
       // Use Wagmi's switchChain for better mobile compatibility
+      console.log("CHain")
       if (switchChain) {
         await switchChain({ chainId: 1440000 });
         console.log('Successfully switched to XRPL EVM testnet via Wagmi');
@@ -116,7 +117,7 @@ const MetamaskProviderInner = ({ children }) => {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [{
-                chainId: '0x15f900',
+                chainId: 1440000,
                 chainName: 'XRPL EVM Sidechain',
                 nativeCurrency: {
                   name: 'XRP',
@@ -163,7 +164,7 @@ const MetamaskProviderInner = ({ children }) => {
     isConnected,
     connecting: isConnecting,
     currentChain: chain,
-    isXRPLEVM: chain?.id === 1449000,
+    isXRPLEVM: chain?.name === "XRPL EVM Sidechain Mainnet",  // <-- HERE!
     connectMetamaskWallet,
     disconnectMetamaskWallet,
     switchToXRPLEVM,

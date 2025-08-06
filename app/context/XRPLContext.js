@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { XummPkce } from 'xumm-oauth2-pkce';
+import { XummSdkJwt } from 'xumm-sdk'; // Add this import
 
 const XRPLContext = createContext(null);
 
@@ -14,13 +15,16 @@ export const XRPLProvider = ({ children }) => {
   const [xrpbBalance, setXrpbBalance] = useState(0);
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Initialize XUMM for mainnet
+  // Initialize XUMM for authentication
   const xumm = new XummPkce('6f42c09e-9637-49f2-8d90-d79f89b9d437', {
     redirectUrl: typeof window !== 'undefined' ? window.location.origin : '',
     rememberJwt: true,
     storage: typeof window !== 'undefined' ? window.localStorage : null,
     implicit: true
   });
+
+  // Initialize XUMM SDK for payload creation (will be set after authentication)
+  const [xummSdk, setXummSdk] = useState(null);
 
   // Utility function to get XRP balance (mainnet)
   const getXrpBalance = async (address) => {
@@ -128,23 +132,36 @@ export const XRPLProvider = ({ children }) => {
       console.error("XUMM error:", error);
     });
 
-    // Check for existing wallet connection
-    const savedWallet = localStorage.getItem(LOCAL_KEY);
-    if (savedWallet) {
+    // Check for existing wallet connection - IMPROVED
+    const checkExistingConnection = async () => {
       try {
-        const walletData = JSON.parse(savedWallet);
-        setXrplWallet(walletData);
-        setXrpWalletAddress(walletData.address);
-        
-        // Fetch current balances
-        getXrpBalance(walletData.address).then(setXrpBalance);
-        getXrpbBalance(walletData.address).then(setXrpbBalance);
+        // First check localStorage
+        const savedWallet = localStorage.getItem(LOCAL_KEY);
+        if (savedWallet) {
+          const walletData = JSON.parse(savedWallet);
+          
+          // Then verify with XUMM state
+          const state = await xumm.state();
+          if (state && state.me && state.me.account === walletData.address) {
+            setXrplWallet(walletData);
+            setXrpWalletAddress(walletData.address);
+            setCurrentStep(2);
+            
+            // Fetch current balances
+            getXrpBalance(walletData.address).then(setXrpBalance);
+            getXrpbBalance(walletData.address).then(setXrpbBalance);
+          } else {
+            // Clear invalid saved data
+            localStorage.removeItem(LOCAL_KEY);
+          }
+        }
       } catch (error) {
-        console.error("Error loading saved wallet:", error);
+        console.error('Error checking existing connection:', error);
         localStorage.removeItem(LOCAL_KEY);
       }
-    }
+    };
 
+    checkExistingConnection();
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const authToken = urlParams.get('xummAuthToken');
@@ -164,68 +181,48 @@ export const XRPLProvider = ({ children }) => {
       if (!xrpWalletAddress) {
         throw new Error('Please connect your XAMAN wallet first');
       }
-
+  
+      // Check if we have an authenticated session
+      const state = await xumm.state();
+      if (!state || !state.me || !state.me.account) {
+        throw new Error('Please authenticate with XAMAN first');
+      }
+  
       console.log('🔗 Setting up XRPB trustline...');
-            const XRPB_ISSUER = "rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT"
+      const XRPB_ISSUER = "rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT"
       const XRPB_CURRENCY = "5852504200000000000000000000000000000000"
       
-      // Create trustline payload for XUMM
-      const trustlinePayload = {
-        TransactionType: 'TrustSet',
-        Account: xrpWalletAddress,
-        LimitAmount: {
-          currency: XRPB_CURRENCY,
-          issuer: XRPB_ISSUER,
-          value: '1000000000' // Set a high limit (1 billion XRPB)
+      // Create trustline payload
+      const payload = await xumm.payload.create({
+        txjson: {
+          TransactionType: 'TrustSet',
+          Account: xrpWalletAddress,
+          LimitAmount: {
+            currency: XRPB_CURRENCY,
+            issuer: XRPB_ISSUER,
+            value: '1000000000'
+          },
+          Flags: 131072
         },
-        Flags: 131072 // tfSetNoRipple flag
-      };
-
-      // Submit to XUMM
-      const request = await xumm.payload.createAndSubscribe(trustlinePayload, (event) => {
-        console.log('Trustline event:', event);
-        if (event.data.signed === true) {
-          console.log('✅ Trustline transaction signed!');
-          return {
-            success: true,
-            message: 'XRPB trustline successfully established!',
-            txHash: event.data.txid
-          };
-        } else if (event.data.signed === false) {
-          console.log('❌ Trustline transaction rejected');
-          return {
-            success: false,
-            message: 'Trustline setup was cancelled or rejected'
-          };
+        options: {
+          submit: false,
+          multisign: false,
+          expire: 24 * 60 * 60 // 24 hours
         }
       });
-
-      // Open XUMM for user to sign
-      if (request.created.next && request.created.next.always) {
-        window.open(request.created.next.always, '_blank');
-      }
-
-      // Wait for the result
-      const result = await request.resolved;
+  
+      console.log('📝 Trustline payload created:', payload);
       
-      if (result.signed) {
-        console.log('✅ XRPB Trustline established successfully!');
-        
-        // Refresh XRPB balance after trustline is set
-        const newXrpbBalance = await getXrpbBalance(xrpWalletAddress);
-        setXrpbBalance(newXrpbBalance);
-        
-        return {
-          success: true,
-          message: 'XRPB trustline successfully established!',
-          txHash: result.txid
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Trustline setup was cancelled or rejected'
-        };
-      }
+      // Return the payload data including QR code
+      return {
+        success: true,
+        message: 'Trustline setup initiated. Scan the QR code with XAMAN.',
+        payloadId: payload.uuid,
+        qrCode: payload.refs.qr_png, // QR code image URL
+        deepLink: payload.next.always, // Deep link for mobile
+        websocketUrl: payload.refs.websocket_status // For real-time status updates
+      };
+  
     } catch (error) {
       console.error('❌ Error setting up XRPB trustline:', error);
       return {
