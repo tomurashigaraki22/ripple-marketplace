@@ -52,7 +52,7 @@ export function initializeWebSocket(server) {
           socket.emit('recent_messages', messages);
 
       } catch (error) {
-        console.error('Error joining room:', error);
+        alert(`Error joining room: ${error.message}`);
         socket.emit('error', 'Failed to join conversation');
       }
     });
