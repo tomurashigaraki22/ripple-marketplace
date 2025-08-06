@@ -46,7 +46,7 @@ const formatErrorMessage = (error) => {
   
   // For any other technical errors, provide a generic user-friendly message
   if (error.length > 100 || errorStr.includes('0x') || errorStr.includes('revert')) {
-    return 'Transaction failed due to a technical issue. Please try again or contact support if the problem persists.';
+    return error;
   }
   
   // Return the original error if it's already user-friendly
@@ -297,9 +297,9 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
     if (solanaConnected && publicKey) {
       wallets.push({
         type: 'solana',
-        name: 'Solflare (SOL)',
+        name: 'Phantom (SOL)',
         address: publicKey.toString(),
-        icon: '☀️',
+        icon: '👻',
         currency: 'XRPB',
         network: 'Solana Mainnet'
       })
@@ -404,11 +404,25 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
       const primaryWallet = selectedPaymentMethod
       const chainType = primaryWallet.type === 'xrpl_evm' ? 'evm' : primaryWallet.type
       
-      // Calculate XRPB amount based on connected wallet's chain
+      // Calculate XRPB amount with enhanced validation
       let xrpbAmount;
       try {
-        xrpbAmount = getPaymentAmountForWallet(parseFloat(listing.price), chainType);
+        const listingPrice = parseFloat(listing.price);
+        if (!listingPrice || listingPrice <= 0 || isNaN(listingPrice)) {
+          throw new Error('Invalid listing price');
+        }
+        
+        xrpbAmount = getPaymentAmountForWallet(listingPrice, chainType);
+        alert(`XRPB MOU ${xrpbAmount} ${listingPrice}`)
+        
+        // Final validation before payment
+        if (!xrpbAmount || xrpbAmount <= 0 || isNaN(xrpbAmount) || !Number.isFinite(xrpbAmount)) {
+          throw new Error('Invalid payment amount calculated');
+        }
+        
+        console.log('💰 Calculated XRPB amount:', xrpbAmount);
       } catch (error) {
+        console.error('Payment calculation error:', error);
         alert(`❌ ${formatErrorMessage(error.message)}`);
         setOrderProcessing(false);
         return;
@@ -418,6 +432,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
       if (chainType === 'xrp') {
         walletForPayment = xrplWallet
       } else if (chainType === 'evm') {
+        alert(`EVM: ${primaryWallet.type}`)
         walletForPayment = getSigner
       } else if (chainType === 'solana') {
         walletForPayment = {
@@ -449,6 +464,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
           paymentResult = await sendXRPLXRPBPayment(walletForPayment, xrpbAmount);
           break;
         case 'xrpl_evm':
+          alert(`This is ht xrpl_evm`)
           if (!walletForPayment) {
             throw new Error('XRPL EVM signer function not provided');
           }
@@ -615,7 +631,10 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
 
   // Function to get payment amount based on connected wallet chain
   const getPaymentAmountForWallet = (priceUSD, walletType) => {
-    if (!priceUSD || priceUSD === 0) return 0;
+    // Add comprehensive validation
+    if (!priceUSD || priceUSD === 0 || isNaN(priceUSD) || priceUSD < 0) {
+      throw new Error('Invalid USD price provided');
+    }
     
     let priceToUse;
     switch (walletType) {
@@ -627,18 +646,31 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
         break;
       case 'xrpl_evm':
       case 'evm':
+        console.log("This is the price to use: ", xrpbPrices.xrplEvm)
         priceToUse = xrpbPrices.xrplEvm;
         break;
       default:
         throw new Error(`Unsupported wallet type: ${walletType}`);
     }
     
-    // If price is not available for this chain, throw error
-    if (!priceToUse || priceToUse <= 0) {
-      throw new Error(`XRPB price not available for ${walletType} chain. Please try again later.`);
+    // Enhanced price validation
+    if (!priceToUse || priceToUse <= 0 || isNaN(priceToUse) || !Number.isFinite(priceToUse)) {
+      throw new Error(`XRPB price not available for ${walletType} chain. Please wait for prices to load or try again later.`);
     }
     
-    return calculateXRPBAmount(priceUSD, priceToUse);
+    try {
+      const calculatedAmount = calculateXRPBAmount(priceUSD, priceToUse);
+      
+      // Validate the calculated amount
+      if (!calculatedAmount || calculatedAmount <= 0 || isNaN(calculatedAmount) || !Number.isFinite(calculatedAmount)) {
+        throw new Error('Failed to calculate valid payment amount');
+      }
+      
+      return calculatedAmount;
+    } catch (error) {
+      console.error('Error calculating XRPB amount:', error);
+      throw new Error('Unable to calculate payment amount. Please try again.');
+    }
   };
 
   // Function to get payment amount for a specific wallet type
@@ -1209,8 +1241,8 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
 
       {/* Updated Payment Confirmation Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-semibold text-white mb-4">Choose Payment Method</h3>
             
             {/* Payment Method Selection */}
@@ -1219,7 +1251,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                 <CreditCard className="w-5 h-5 mr-2 text-[#39FF14]" />
                 Select Wallet
               </h4>
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-60 overflow-y-auto">
                 {connectedWallets.map((wallet, index) => {
                   const amount = getPaymentAmount(parseFloat(listing.price), wallet.type)
                   return (
@@ -1262,8 +1294,8 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
 
             {/* Payment Summary */}
             {selectedPaymentMethod && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-[#39FF14]/10 to-emerald-400/10 rounded-lg border border-[#39FF14]/30">
-                <h4 className="text-lg font-semibold text-white mb-3 flex items-center">
+              <div className="mb-6 p-4 bg-gradient-to-r from-[#39FF14]/10 to-emerald-400/10 rounded-lg border border-[#39FF14]/30 max-h-64 overflow-y-auto">
+                <h4 className="text-lg font-semibold text-white mb-3 flex items-center sticky top-0 bg-gradient-to-r from-[#39FF14]/10 to-emerald-400/10 pb-2">
                   <DollarSign className="w-5 h-5 mr-2 text-[#39FF14]" />
                   Payment Summary
                 </h4>
@@ -1278,7 +1310,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">XRPB Price:</span>
-                    <span className="text-[#39FF14]">${xrpbPrice?.toFixed(9) || "N/A"}</span>
+                    <span className="text-[#39FF14]">${xrpbPrice?.toFixed(18) || "N/A"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">Payment Method:</span>
@@ -1648,7 +1680,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">XRPB Price:</span>
-                    <span className="text-[#39FF14]">${xrpbPrice.toFixed(2)}</span>
+                    <span className="text-[#39FF14]">${xrpbPrice.toFixed(9)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-300">Payment Method:</span>

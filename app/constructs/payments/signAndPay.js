@@ -213,6 +213,7 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     const senderTokenAccountInfo = await connection.getTokenAccountBalance(senderTokenAccount);
     const currentBalance = senderTokenAccountInfo.value.uiAmount || 0;
     
+    
     console.log('Current XRPB balance:', currentBalance);
     console.log('Required amount:', amount);
     

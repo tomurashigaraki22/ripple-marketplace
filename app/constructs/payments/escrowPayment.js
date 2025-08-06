@@ -4,6 +4,16 @@ export async function createEscrowPayment(paymentData) {
   const { seller, buyer, amount, chain, conditions, listingId, wallet, connection } = paymentData;
   
   try {
+    // Add amount validation at the start
+    if (!amount || amount === null || amount === undefined || isNaN(amount) || amount <= 0) {
+      throw new Error('Invalid payment amount provided');
+    }
+
+    const validAmount = Number(amount);
+    if (!Number.isFinite(validAmount) || validAmount <= 0) {
+      throw new Error('Invalid payment amount format');
+    }
+
     console.log('🔄 Step 1: Creating escrow record...');
     
     // 1. Create escrow record
@@ -16,7 +26,7 @@ export async function createEscrowPayment(paymentData) {
       body: JSON.stringify({
         seller,
         buyer,
-        amount,
+        amount: validAmount,
         chain,
         conditions,
         listingId
@@ -37,7 +47,7 @@ export async function createEscrowPayment(paymentData) {
     const escrowWallet = escrowData.escrowWallet;
     
     console.log('💰 Escrow wallet address:', escrowWallet);
-    console.log('💰 Payment amount:', amount);
+    console.log('💰 Payment amount:', validAmount);
     console.log('🔗 Payment chain:', chain);
     
     switch (chain) {
@@ -45,19 +55,19 @@ export async function createEscrowPayment(paymentData) {
         if (!wallet || !connection) {
           throw new Error('Solana wallet or connection not provided');
         }
-        paymentResult = await sendSolanaXRPBPayment(wallet, amount, connection);
+        paymentResult = await sendSolanaXRPBPayment(wallet, validAmount, connection);
         break;
       case 'xrpl':
         if (!wallet) {
           throw new Error('XRPL wallet not provided');
         }
-        paymentResult = await sendXRPLXRPBPayment(wallet, amount);
+        paymentResult = await sendXRPLXRPBPayment(wallet, validAmount);
         break;
       case 'xrpl_evm':
         if (!wallet) {
           throw new Error('XRPL EVM signer function not provided');
         }
-        paymentResult = await sendXRPLEvmXRPBPayment(wallet, amount);
+        paymentResult = await sendXRPLEvmXRPBPayment(wallet, validAmount);
         break;
       default:
         throw new Error(`Unsupported chain: ${chain}`);

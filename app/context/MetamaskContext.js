@@ -2,11 +2,11 @@
 
 import React, { createContext, useContext, useEffect } from 'react';
 import { WagmiProvider, createConfig, http } from 'wagmi';
-import { defineChain } from 'viem';
-import { metaMask } from 'wagmi/connectors';
+import { custom, defineChain } from 'viem';
+import { metaMask, walletConnect } from 'wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAccount, useConnect, useDisconnect, useSwitchChain, useWalletClient } from 'wagmi';
-import { ethers } from 'ethers';
+import { BrowserProvider, ethers } from 'ethers';
 
 const MetamaskContext = createContext(null);
 
@@ -36,11 +36,51 @@ const xrplEvmTestnet = defineChain({
   },
 });
 
-// Simplified Wagmi configuration - only injected connector
+// Helper function to detect mobile
+const isMobile = () => {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+// Simplified Wagmi configuration - improved mobile support
 const config = createConfig({
   chains: [xrplEvmTestnet],
   connectors: [
     metaMask(),
+    walletConnect({
+      projectId: '7f999d777dd494df9a3038f609665cea',
+      metadata: {
+        name: 'RippleBids',
+        description: 'Decentralized Commerce',
+        url: 'https://ripplebids.com',
+        icons: ['https://ripplebids.com/logo.jpg'], // Use your actual logo
+      },
+      showQrModal: true, // Always show QR modal
+      qrModalOptions: {
+        themeMode: 'light',
+        themeVariables: {
+          '--wcm-z-index': '1000'
+        },
+        mobileLinks: [
+          'metamask',
+          'trust',
+          'rainbow',
+          'coinbase',
+          'argent',
+          'imtoken',
+          'pillar'
+        ],
+        desktopLinks: [
+          'metamask',
+          'trust',
+          'rainbow',
+          'coinbase'
+        ],
+        walletImages: {
+          metamask: 'https://avatars.githubusercontent.com/u/11744586?s=280&v=4'
+        }
+      },
+    }),
   ],
   transports: {
     [xrplEvmTestnet.id]: http(),
@@ -49,11 +89,6 @@ const config = createConfig({
 
 const queryClient = new QueryClient();
 
-// Helper function to detect mobile
-const isMobile = () => {
-  if (typeof window === 'undefined') return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
 
 // Inner component that uses Wagmi hooks
 const MetamaskProviderInner = ({ children }) => {
@@ -71,25 +106,56 @@ const MetamaskProviderInner = ({ children }) => {
     }
   }, [isConnected, address, chain]);
 
-  const connectMetamaskWallet = async () => {
-    try {
-      console.log("Connectors: ", connectors)
-      const metamaskConnector = connectors.find(
-        (connector) => connector.id === 'metaMaskSDK'
+const connectMetamaskWallet = async () => {
+  try {
+    console.log('Available connectors:', connectors.map((c) => ({ id: c.id, name: c.name })));
+    
+    // For mobile, prefer WalletConnect, for desktop prefer MetaMask
+    const preferredConnector = isMobile()
+      ? connectors.find((c) => c.id === 'walletConnect') || connectors.find((c) => c.id === 'metaMask')
+      : connectors.find((c) => c.id === 'metaMask') || connectors.find((c) => c.id === 'walletConnect');
+
+    if (!preferredConnector) {
+      throw new Error('No suitable wallet connector found. Please install MetaMask or a WalletConnect compatible wallet.');
+    }
+
+    console.log('Using connector:', preferredConnector.id);
+    
+    // Add timeout for mobile connections
+    const connectPromise = connect({ connector: preferredConnector });
+    
+    if (isMobile()) {
+      // 30 second timeout for mobile
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout. Please try again.')), 30000)
       );
       
-      if (!metamaskConnector) {
-        throw new Error('MetaMask connector not found');
-      }
-
-      connect({ connector: metamaskConnector });
-      
-    } catch (error) {
-      console.error("MetaMask connection error:", error);
-      alert(`Failed to connect MetaMask: ${error}`);
-      throw error;
+      await Promise.race([connectPromise, timeoutPromise]);
+    } else {
+      await connectPromise;
     }
-  };
+    
+  } catch (error) {
+    console.error("Connection error:", error);
+    
+    // More specific error messages
+    let errorMessage = 'Failed to connect wallet';
+    
+    if (error.message?.includes('timeout')) {
+      errorMessage = 'Connection timed out. Please ensure your wallet app is open and try again.';
+    } else if (error.message?.includes('rejected')) {
+      errorMessage = 'Connection was rejected. Please approve the connection in your wallet.';
+    } else if (error.message?.includes('No suitable')) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = `Connection failed: ${error.message || 'Unknown error'}`;
+    }
+    
+    alert(errorMessage);
+    throw error;
+  }
+};
+
 
   const switchToXRPLEVM = async () => {
     try {
@@ -148,15 +214,21 @@ const MetamaskProviderInner = ({ children }) => {
   };
 
   // Create ethers signer from wallet client
-  const getSigner = async () => {
-    if (!walletClient) {
-      throw new Error('Wallet not connected');
-    }
-    
-    // Convert viem wallet client to ethers signer
+
+const getSigner = async () => {
+  if (!walletClient) {
+    throw new Error('Wallet not connected');
+  }
+
+  // Convert viem WalletClient to an EIP-1193 compatible provider for ethers
+  let signer;
+  if (walletClient) {
     const provider = new ethers.BrowserProvider(walletClient);
-    return provider.getSigner();
-  };
+    signer = await provider.getSigner();
+  }
+  alert(`Signer: ${signer}`)
+  return signer;
+};
 
   const value = {
     metamaskWalletAddress: address,

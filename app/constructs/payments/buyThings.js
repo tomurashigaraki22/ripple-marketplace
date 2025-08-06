@@ -44,7 +44,7 @@ const formatErrorMessage = (error) => {
   
   // For any other technical errors, provide a generic user-friendly message
   if (error.length > 100 || errorStr.includes('0x') || errorStr.includes('revert')) {
-    return 'Transaction failed due to a technical issue. Please try again or contact support if the problem persists.';
+    return error;
   }
   
   // Return the original error if it's already user-friendly
@@ -201,6 +201,8 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     if (!senderAccountInfo) {
       throw new Error('❌ You do not have an XRPB token account. Please ensure you have XRPB tokens in your wallet first.');
     }
+        alert("I got here")
+
     
     // Check sender's XRPB balance
     console.log('💰 Checking XRPB balance...');
@@ -209,6 +211,7 @@ export const sendSolanaXRPBPayment = async (wallet, amount, connection) => {
     
     console.log('Current XRPB balance:', currentBalance);
     console.log('Required amount:', amount);
+    console.log("I got here")
     
     if (currentBalance < amount) {
       throw new Error(`❌ Insufficient XRPB balance. Required: ${amount} XRPB, Available: ${currentBalance} XRPB`);
@@ -437,22 +440,59 @@ export const sendXRPLXRPBPayment = async (wallet, amount) => {
  */
 export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
   try {
+    // Enhanced amount validation for mobile compatibility
+    console.log('🔍 Raw amount received:', amount, typeof amount);
+    
+    if (amount === null || amount === undefined) {
+      throw new Error('Payment amount is null or undefined. Please refresh and try again.');
+    }
+    
+    if (amount === '' || amount === 0) {
+      throw new Error('Payment amount cannot be empty or zero.');
+    }
+
+    // Convert to string first to handle any mobile-specific number formatting
+    const amountStr = String(amount).trim();
+    if (!amountStr || amountStr === 'null' || amountStr === 'undefined') {
+      throw new Error('Invalid payment amount format. Please refresh and try again.');
+    }
+
+    // Parse as number with additional validation
+    const validAmount = parseFloat(amountStr);
+    if (isNaN(validAmount) || !Number.isFinite(validAmount) || validAmount <= 0) {
+      throw new Error(`Invalid payment amount: ${amountStr}. Please refresh and try again.`);
+    }
+
+    console.log('✅ Validated amount:', validAmount);
+
     if (!getSignerFn) {
       throw new Error('Signer function not provided');
     }
 
-    // Get signer from Wagmi
-    const signer = await getSignerFn();
+    // Get signer from Wagmi with timeout for mobile
+    let signer;
+    try {
+      const signerPromise = getSignerFn();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Signer timeout')), 10000)
+      );
+      signer = await Promise.race([signerPromise, timeoutPromise]);
+    } catch (signerError) {
+      console.error('Signer error:', signerError);
+      alert(`SIGNER: ${signerError}`)
+      throw new Error('Failed to get wallet signer. Please reconnect your wallet and try again.');
+    }
+    
     if (!signer) {
       throw new Error('XRPL EVM Signer not available');
     }
 
     const fromAddress = await signer.getAddress();
     
-    console.log('🟠 XRPL EVM XRPB PAYMENT INITIATED (TESTNET)');
+    console.log('🟠 XRPL EVM XRPB PAYMENT INITIATED (MAINNET)');
     console.log('From:', fromAddress);
     console.log('To:', PAYMENT_RECIPIENTS.xrplEvm);
-    console.log('Amount:', amount, 'XRPB');
+    console.log('Amount:', validAmount, 'XRPB');
     
     // ERC-20 XRPB Token Contract ABI (minimal)
     const xrpbAbi = [
@@ -461,33 +501,233 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
       'function decimals() view returns (uint8)'
     ];
     
-    // Create contract instance
-    const xrpbContract = new ethers.Contract(
-      XRPB_TOKENS.xrplEvm.address,
-      xrpbAbi,
-      signer
-    );
+    // Create contract instance with error handling
+    let xrpbContract;
+    try {
+      xrpbContract = new ethers.Contract(
+        XRPB_TOKENS.xrplEvm.address,
+        xrpbAbi,
+        signer
+      );
+    } catch (contractError) {
+      console.error('Contract creation error:', contractError);
+      throw new Error('Failed to create token contract. Please try again.');
+    }
     
-    // Convert amount to token units (considering decimals)
-    const tokenAmount = ethers.parseUnits(amount.toString(), XRPB_TOKENS.xrplEvm.decimals);
+    // Convert amount to token units with enhanced mobile validation
+    let tokenAmount;
+    try {
+      // Ensure we have valid decimals
+      const parsedAmount = Number(validAmount);
+      if (!parsedAmount || isNaN(parsedAmount) || !Number.isFinite(parsedAmount)) {
+        throw new Error('Invalid amount format');
+      }
+
+      const decimals = 18;
+      if (!Number.isInteger(decimals) || decimals < 0 || decimals > 77) {
+        throw new Error('Invalid token decimals');
+      }
+
+      console.log('🔢 Converting amount:', parsedAmount, 'with decimals:', decimals);
+      
+      // CRITICAL FIX: Ensure the amount string is properly formatted
+      const amountString = parsedAmount.toString();
+      
+      // Validate the string before parsing
+      if (!amountString || amountString === 'null' || amountString === 'undefined' || amountString === 'NaN') {
+        throw new Error(`Invalid amount string: ${amountString}`);
+      }
+      
+      console.log('📝 Amount string for parsing:', amountString);
+      
+      // Parse with ethers - this is where the BigNumberish error occurs
+      tokenAmount = ethers.parseUnits(amountString, decimals);
+      
+      // CRITICAL: Ensure we have a valid BigInt
+      if (!tokenAmount || typeof tokenAmount !== 'bigint') {
+        console.error('❌ parseUnits returned invalid value:', tokenAmount, typeof tokenAmount);
+        // Fallback: manually create BigInt
+        const multiplier = BigInt(10) ** BigInt(decimals);
+        const wholePart = BigInt(Math.floor(parsedAmount));
+        const decimalPart = BigInt(Math.round((parsedAmount - Math.floor(parsedAmount)) * Number(multiplier)));
+        tokenAmount = wholePart * multiplier + decimalPart;
+      }
+      
+      console.log('✅ Token amount (BigInt):', tokenAmount.toString(), 'Type:', typeof tokenAmount);
+      
+      // Validate it's a positive BigInt
+      if (tokenAmount <= 0n) {
+        throw new Error('Token amount must be greater than zero');
+      }
+      
+    } catch (parseError) {
+      console.error('❌ Error parsing token amount:', parseError);
+      console.error('Input values - validAmount:', validAmount, 'decimals:', XRPB_TOKENS.xrplEvm.decimals);
+      
+      // More specific error for BigNumber issues
+      if (parseError.message.includes('invalid BigNumber') || parseError.message.includes('BigNumberish')) {
+        throw new Error(`Invalid payment amount format. Amount: ${validAmount}. Please try again with a valid number.`);
+      }
+      
+      throw new Error(`Failed to process payment amount: ${parseError.message}. Please refresh and try again.`);
+    }
+    
+    // Additional validation before transfer
+    if (!tokenAmount || tokenAmount.toString() === '0') {
+      throw new Error('Token amount calculation failed. Please refresh and try again.');
+    }
     
     console.log('📝 XRPB Transfer prepared:', {
       contract: XRPB_TOKENS.xrplEvm.address,
       to: PAYMENT_RECIPIENTS.xrplEvm,
-      amount: tokenAmount.toString()
+      amount: tokenAmount.toString(),
+      originalAmount: validAmount
     });
     
-    // Send XRPB transfer transaction
-    const txResponse = await xrpbContract.transfer(
-      PAYMENT_RECIPIENTS.xrplEvm,
-      tokenAmount
-    );
+    // Send XRPB transfer transaction with additional validation
+    let txResponse;
+    try {
+      // FINAL CHECK: Ensure tokenAmount is valid before transfer
+      if (!tokenAmount || typeof tokenAmount.toString !== 'function') {
+        throw new Error('Invalid token amount object');
+      }
+      
+      console.log('🚀 Executing transfer with tokenAmount:', tokenAmount.toString());
+      
+      // Mobile-specific transaction options
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      let transferOptions = {};
+      
+      if (isMobile) {
+        console.log('📱 Mobile device detected, using mobile-optimized settings');
+        
+        // For mobile, we need to be more explicit with gas settings
+        try {
+          // Estimate gas first
+          const gasEstimate = await xrpbContract.transfer.estimateGas(
+            PAYMENT_RECIPIENTS.xrplEvm,
+            tokenAmount
+          );
+          
+          console.log('⛽ Gas estimate:', gasEstimate.toString());
+          
+          // Add 20% buffer for mobile
+          const gasLimit = (gasEstimate * BigInt(120)) / BigInt(100);
+          
+          transferOptions = {
+            gasLimit: gasLimit,
+            // Let the wallet handle gas price on mobile
+          };
+          
+          console.log('📱 Mobile transfer options:', transferOptions);
+          
+        } catch (gasError) {
+          console.warn('⚠️ Gas estimation failed, proceeding without explicit gas limit:', gasError);
+          // Continue without gas limit - let mobile wallet handle it
+        }
+      }
+      
+      console.log('🚀 Executing transfer...');
+      
+      // Execute transfer with mobile-specific options
+      if (Object.keys(transferOptions).length > 0) {
+        txResponse = await xrpbContract.transfer(
+          PAYMENT_RECIPIENTS.xrplEvm,
+          tokenAmount,
+          transferOptions
+        );
+      } else {
+        txResponse = await xrpbContract.transfer(
+          PAYMENT_RECIPIENTS.xrplEvm,
+          tokenAmount
+        );
+      }
+      
+      console.log('✅ Transfer initiated successfully:', txResponse.hash);
+      
+    } catch (transferError) {
+      console.error('❌ Transfer error:', transferError);
+      
+      const errorMessage = transferError.message || transferError.toString();
+      
+      // Handle the specific BigNumberish error
+      if (errorMessage.includes('invalid BigNumber') || errorMessage.includes('BigNumberish')) {
+        console.error('🔍 BigNumberish error details:', {
+          tokenAmount: tokenAmount?.toString(),
+          validAmount,
+          decimals: XRPB_TOKENS.xrplEvm.decimals,
+          recipient: PAYMENT_RECIPIENTS.xrplEvm
+        });
+        throw new Error('Transaction amount is invalid. This may be due to a mobile browser issue. Please try refreshing the page or using a desktop browser.');
+      }
+      
+      if (errorMessage.includes('insufficient funds') || errorMessage.includes('insufficient balance')) {
+        throw new Error('Insufficient XRPB balance in your wallet.');
+      }
+      
+      if (errorMessage.includes('user rejected') || errorMessage.includes('user denied')) {
+        throw new Error('Transaction was cancelled by user.');
+      }
+      
+      if (errorMessage.includes('gas') || errorMessage.includes('out of gas')) {
+        throw new Error('Transaction failed due to gas issues. Please try again.');
+      }
+      
+      if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+        throw new Error('Network connection issue. Please check your connection and try again.');
+      }
+      
+      if (errorMessage.includes('nonce')) {
+        throw new Error('Transaction nonce error. Please refresh and try again.');
+      }
+      
+      // Mobile-specific errors
+      if (errorMessage.includes('missing revert data') || errorMessage.includes('call_exception')) {
+        throw new Error('Transaction failed on mobile. Please ensure you have sufficient XRPB balance and network connection.');
+      }
+      
+      // Generic mobile-friendly error
+      throw new Error(`Transaction failed: ${formatErrorMessage(errorMessage)}. If this persists on mobile, try using a desktop browser.`);
+    }
     
     console.log('⏳ XRPB transfer sent, waiting for confirmation...');
     console.log('Transaction Hash:', txResponse.hash);
+    alert(`XRPB Transfer sent: `)
     
-    // Wait for confirmation
-    const receipt = await txResponse.wait();
+    // Wait for confirmation with timeout
+    let receipt;
+    try {
+      const receiptPromise = txResponse.wait();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Transaction confirmation timeout')), 60000)
+      );
+      receipt = await Promise.race([receiptPromise, timeoutPromise]);
+    } catch (confirmError) {
+      console.error('Confirmation error:', confirmError);
+      // Transaction might still succeed, so we'll return partial success
+      const paymentData = {
+        blockchain: 'XRPL_EVM',
+        token: 'XRPB',
+        from: fromAddress,
+        to: PAYMENT_RECIPIENTS.xrplEvm,
+        amount: validAmount,
+        txHash: txResponse.hash,
+        timestamp: new Date().toISOString(),
+        explorerUrl: `https://explorer.xrplevm.org/tx/${txResponse.hash}`,
+        network: 'mainnet',
+        status: 'pending'
+      };
+      
+      localStorage.setItem(`xrpl_evm_xrpb_payment_${txResponse.hash}`, JSON.stringify(paymentData));
+      
+      return { 
+        success: true, 
+        txHash: txResponse.hash, 
+        paymentData,
+        warning: 'Transaction sent but confirmation timed out. Please check the explorer link to verify completion.'
+      };
+    }
     
     console.log('✅ XRPL EVM XRPB Payment Successful!');
     console.log('Transaction Hash:', txResponse.hash);
@@ -500,7 +740,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
       token: 'XRPB',
       from: fromAddress,
       to: PAYMENT_RECIPIENTS.xrplEvm,
-      amount: amount,
+      amount: validAmount,
       txHash: txResponse.hash,
       blockNumber: receipt.blockNumber,
       gasUsed: receipt.gasUsed.toString(),
