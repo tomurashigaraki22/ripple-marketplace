@@ -481,7 +481,7 @@ export const sendXRPLEvmXRPBPayment = async (getSignerFn, amount) => {
       if (confirmOpen) {
         // Create deep link with current page URL for dapp browser
         const currentUrl = window.location.href;
-        const deepLink = `https://metamask.app.link/dapp/${encodeURIComponent(currentUrl.replace(/^https?:\/\//, ''))}`;
+        const deepLink = `https://metamask.app.link/dapp/ripplebids.com`;
         
         console.log('🔗 Redirecting to MetaMask mobile with deep link:', deepLink);
         
