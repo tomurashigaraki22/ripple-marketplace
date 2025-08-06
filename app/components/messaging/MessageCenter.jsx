@@ -26,7 +26,7 @@ export default function MessageCenter({ orderId, userType }) {
     if (!user || !orderId) return;
 
     // Initialize socket connection
-    const newSocket = io("wss://ripple-websocket-server.onrender.com", {
+    const newSocket = io("https://ripple-websocket-server.onrender.com", {
       transports: ['websocket'],
       upgrade: false
     });
