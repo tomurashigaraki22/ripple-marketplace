@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Menu, X, Wallet, User, ShoppingBag, LogOut, ChevronDown, Zap, Shield, Globe, Package } from "lucide-react"
+import { Menu, X, Wallet, User, ShoppingBag, LogOut, ChevronDown, Zap, Shield, Globe, Package, Store } from "lucide-react"
 import Image from "next/image"
 import { useAuth } from "../context/AuthContext"
 import { useXRPL } from "../context/XRPLContext"
@@ -123,7 +123,7 @@ export default function Navbar() {
         {/* Glowing Top Border */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#39FF14] to-transparent opacity-60" />
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-2 sm:px-2 lg:px-2">
           {/* Top Bar */}
           <div className="flex justify-between items-center h-20">
             {/* Logo & Brand */}
@@ -151,11 +151,12 @@ export default function Navbar() {
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-1">
               {[
-                ...(!user ? [{ href: '/marketplace', label: 'Marketplace', icon: ShoppingBag }] : []),
-                ...(user ? [{ href: '/marketplace/orders', label: 'My Orders', icon: Package }] : []),
+                { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
+                ...(user ? [{ href: '/marketplace/orders', label: 'Orders', icon: Package }] : []),
+                ...(user ? [{ href: '/storefront/login', label: 'StoreFront', icon: Store }] : []),
                 { href: '/membership', label: 'Membership', icon: Shield },
-                { href: '/portal', label: 'My Portal', icon: User },
-                { href: '/faqs', label: 'FAQs', icon: Globe }
+                ...(user ? [{ href: '/portal', label: 'Portal', icon: User }] : []),
+                ...(!user ? [{ href: '/faqs', label: 'FAQs', icon: Globe }] : []),
               ].map(({ href, label, icon: Icon }) => (
                 <Link
                   key={href}
@@ -331,12 +332,13 @@ export default function Navbar() {
               {/* Mobile Navigation */}
               <div className="space-y-2">
                 {[
-                  ...(!user ? [{ href: '/marketplace', label: 'Marketplace', icon: ShoppingBag }] : []),
-                ...(user ? [{ href: '/marketplace/orders', label: 'My Orders', icon: Package }] : []),
-                  { href: '/membership', label: 'Membership', icon: Shield },
-                  { href: '/portal', label: 'My Portal', icon: User },
-                  { href: '/faqs', label: 'FAQs', icon: Globe }
-                ].map(({ href, label, icon: Icon }) => (
+                { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
+                ...(user ? [{ href: '/marketplace/orders', label: 'Orders', icon: Package }] : []),
+                ...(user ? [{ href: '/storefront/login', label: 'StoreFront', icon: Store }] : []),
+                { href: '/membership', label: 'Membership', icon: Shield },
+                ...(user ? [{ href: '/portal', label: 'Portal', icon: User }] : []),
+                ...(!user ? [{ href: '/faqs', label: 'FAQs', icon: Globe }] : []),
+              ].map(({ href, label, icon: Icon }) => (
                   <Link
                     key={href}
                     href={href}

@@ -372,7 +372,7 @@ const fetchOrders = async () => {
                         
                         <div className="text-left sm:text-right">
                           <div className="text-lg sm:text-xl font-bold text-[#39FF14] mb-2">
-                            ${order.amount} USD
+                            {order.amount} XRPB
                           </div>
                           <div className={`inline-flex items-center space-x-2 px-2 sm:px-3 py-1 rounded-full border text-xs sm:text-sm font-medium ${getStatusColor(order.status)}`}>
                             {getStatusIcon(order.status)}
