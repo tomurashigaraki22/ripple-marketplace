@@ -25,14 +25,8 @@ export default function StorefrontSettings() {
       paymentReceived: true,
       lowStock: true,
       promotions: false,
-      newsletter: false
     },
-    pushNotifications: {
-      newOrders: true,
-      orderUpdates: true,
-      paymentReceived: true,
-      lowStock: false
-    },
+
     
     // Privacy & Security
     profileVisibility: 'public',
@@ -321,7 +315,7 @@ export default function StorefrontSettings() {
                   </div>
 
                   {/* Push Notifications */}
-                  <div>
+                  {/* <div>
                     <h3 className="text-lg font-medium text-white mb-4 flex items-center">
                       <Smartphone className="w-4 h-4 mr-2" />
                       Push Notifications
@@ -352,7 +346,7 @@ export default function StorefrontSettings() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               )}
 
@@ -367,7 +361,7 @@ export default function StorefrontSettings() {
                   </div>
 
                   {/* Profile Visibility */}
-                  <div>
+                  {/* <div>
                     <h3 className="text-lg font-medium text-white mb-4 flex items-center">
                       <Eye className="w-4 h-4 mr-2" />
                       Profile Visibility
@@ -420,7 +414,7 @@ export default function StorefrontSettings() {
                         </label>
                       </div>
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Security */}
                   <div>
@@ -429,7 +423,7 @@ export default function StorefrontSettings() {
                       Security
                     </h3>
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
+                      {/* <div className="flex items-center justify-between">
                         <div>
                           <label className="text-gray-300 font-medium">Two-Factor Authentication</label>
                           <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
@@ -443,7 +437,7 @@ export default function StorefrontSettings() {
                           />
                           <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
                         </label>
-                      </div>
+                      </div> */}
 
                       <div className="flex items-center justify-between">
                         <div>
@@ -479,7 +473,7 @@ export default function StorefrontSettings() {
                   <div>
                     <h3 className="text-lg font-medium text-white mb-4">Order Management</h3>
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
+                      {/* <div className="flex items-center justify-between">
                         <div>
                           <label className="text-gray-300 font-medium">Auto-Accept Orders</label>
                           <p className="text-sm text-gray-500">Automatically accept orders without manual review</p>
@@ -493,9 +487,9 @@ export default function StorefrontSettings() {
                           />
                           <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
                         </label>
-                      </div>
+                      </div> */}
 
-                      <div className="flex items-center justify-between">
+                      {/* <div className="flex items-center justify-between">
                         <div>
                           <label className="text-gray-300 font-medium">Require Buyer Message</label>
                           <p className="text-sm text-gray-500">Require buyers to include a message with their order</p>
@@ -509,7 +503,7 @@ export default function StorefrontSettings() {
                           />
                           <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
                         </label>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
 
@@ -552,7 +546,7 @@ export default function StorefrontSettings() {
                   </div>
 
                   {/* Business Hours */}
-                  <div>
+                  {/* <div>
                     <h3 className="text-lg font-medium text-white mb-4">Business Hours</h3>
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
@@ -594,7 +588,7 @@ export default function StorefrontSettings() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               )}
 

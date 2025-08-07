@@ -32,6 +32,8 @@ export default function NewListing() {
     },
     return_policy: "",
     quantity_available: 1,
+    stock_quantity: 1, // Track inventory separately
+    low_stock_threshold: 5, // Alert threshold
     sku: "",
     isbn: "",
     upc_ean: "",
@@ -47,6 +49,8 @@ export default function NewListing() {
     is_negotiable: false,
     min_offer_price: "",
     is_auction: false,
+    starting_bid: "", // Add this field
+    bid_increment: "10", // Add this field
     auction_end_date: "",
     reserve_price: "",
     buy_it_now_price: ""
@@ -412,6 +416,36 @@ export default function NewListing() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Stock Quantity */}
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Stock Quantity *</label>
+                <input
+                  type="number"
+                  name="stock_quantity"
+                  value={formData.stock_quantity}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                  placeholder="1"
+                  min="1"
+                  required
+                />
+              </div>
+
+              {/* Low Stock Threshold */}
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">Low Stock Alert</label>
+                <input
+                  type="number"
+                  name="low_stock_threshold"
+                  value={formData.low_stock_threshold}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                  placeholder="5"
+                  min="0"
+                />
+                <p className="text-gray-400 text-xs mt-1">Get notified when stock falls below this number</p>
               </div>
 
               {/* Condition */}
@@ -988,6 +1022,158 @@ export default function NewListing() {
               />
               <p className="text-gray-400 text-sm mt-2">Add relevant keywords to help buyers find your listing</p>
             </div>
+          </div>
+
+          {/* Auction Settings */}
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-white mb-6">Listing Type</h3>
+            
+            {/* Listing Type Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-white mb-4">How would you like to sell this item?</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex items-center space-x-3 p-4 border border-gray-600 rounded-lg hover:border-[#39FF14]/50 transition-colors cursor-pointer">
+                  <input
+                    type="radio"
+                    name="listingType"
+                    checked={!formData.is_auction}
+                    onChange={() => setFormData(prev => ({ ...prev, is_auction: false }))}
+                    className="text-[#39FF14] focus:ring-[#39FF14]"
+                  />
+                  <div>
+                    <div className="text-white font-medium">Buy Now</div>
+                    <div className="text-gray-400 text-sm">Sell at a fixed price</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-center space-x-3 p-4 border border-gray-600 rounded-lg hover:border-[#39FF14]/50 transition-colors cursor-pointer">
+                  <input
+                    type="radio"
+                    name="listingType"
+                    checked={formData.is_auction}
+                    onChange={() => {
+                      const futureDate = new Date()
+                      futureDate.setDate(futureDate.getDate() + 7) // Default to 7 days from now
+                      
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        is_auction: true,
+                        auction_end_date: futureDate.toISOString().slice(0, 16),
+                        starting_bid: prev.price || "1" // Use current price as starting bid or default to $1
+                      }))
+                    }}
+                    className="text-[#39FF14] focus:ring-[#39FF14]"
+                  />
+                  <div>
+                    <div className="text-white font-medium">Auction</div>
+                    <div className="text-gray-400 text-sm">Let buyers bid on your item</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Auction-specific fields */}
+            {formData.is_auction && (
+              <div className="space-y-6 border-t border-gray-600 pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Starting Bid */}
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">Starting Bid (USD) *</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="number"
+                        name="starting_bid"
+                        value={formData.starting_bid || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, starting_bid: e.target.value }))}
+                        className="w-full pl-10 pr-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                        placeholder="0.00"
+                        step="0.01"
+                        min="1"
+                        required={formData.is_auction}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bid Increment */}
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">Bid Increment *</label>
+                    <select
+                      name="bid_increment"
+                      value={formData.bid_increment || '10'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, bid_increment: e.target.value }))}
+                      className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                      required={formData.is_auction}
+                    >
+                      <option value="10">$10 USD</option>
+                      <option value="100">$100 USD</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Auction Duration */}
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Auction End Date *</label>
+                  <input
+                    type="datetime-local"
+                    name="auction_end_date"
+                    value={formData.auction_end_date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, auction_end_date: e.target.value }))}
+                    min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)} // Minimum 1 hour from now
+                    max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)} // Maximum 30 days
+                    className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                    required={formData.is_auction}
+                  />
+                  <p className="text-gray-400 text-sm mt-2">Auctions can run for up to 30 days</p>
+                </div>
+
+                {/* Buy It Now Option */}
+                <div>
+                  <label className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.buy_it_now_price}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        buy_it_now_price: e.target.checked ? prev.price : '' 
+                      }))}
+                      className="text-[#39FF14] focus:ring-[#39FF14]"
+                    />
+                    <span className="text-white">Allow "Buy It Now" option</span>
+                  </label>
+                  
+                  {formData.buy_it_now_price && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Buy It Now Price (USD)</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="number"
+                          name="buy_it_now_price"
+                          value={formData.buy_it_now_price}
+                          onChange={(e) => setFormData(prev => ({ ...prev, buy_it_now_price: e.target.value }))}
+                          className="w-full pl-10 pr-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                          placeholder="0.00"
+                          step="0.01"
+                          min={parseFloat(formData.starting_bid || 0) + 10}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <h4 className="text-blue-400 font-semibold mb-2">📋 Auction Guidelines</h4>
+                  <ul className="text-gray-300 text-sm space-y-1">
+                    <li>• Bidders must have sufficient wallet balance to place bids</li>
+                    <li>• Bids increase by your selected increment ($10 or $100)</li>
+                    <li>• The highest bidder at auction end wins the item</li>
+                    <li>• Winners have 24 hours to complete payment</li>
+                    <li>• All auctions are final - no cancellations after first bid</li>
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}

@@ -185,7 +185,35 @@ export async function initializeDatabase() {
       )
     `;
 
-    // Create tables in order (dependencies first)
+    // Email queue table for asynchronous email processing
+    const createEmailQueueTable = `
+      CREATE TABLE IF NOT EXISTS email_queue (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        recipient VARCHAR(255) NOT NULL,
+        subject VARCHAR(500) NOT NULL,
+        template_name VARCHAR(100) NOT NULL,
+        data JSON,
+        status ENUM('pending', 'processing', 'sent', 'failed') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processed_at TIMESTAMP NULL,
+        result JSON,
+        INDEX idx_status (status),
+        INDEX idx_created_at (created_at)
+      ) COLLATE=utf8mb4_general_ci
+    `;
+
+    // Admin settings table
+    const createAdminSettingsTable = `
+      CREATE TABLE IF NOT EXISTS admin_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        \`key\` VARCHAR(255) UNIQUE NOT NULL,
+        value JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) COLLATE=utf8mb4_general_ci
+    `;
+
+    // Execute table creation queries
     await db.query(createRolesTable);
     await db.query(createMembershipTiersTable);
     await db.query(createUsersTable);
@@ -196,6 +224,8 @@ export async function initializeDatabase() {
     await db.query(createEscrowsTable);
     await db.query(createNotificationsTable);
     await db.query(createMessagesTable);
+    await db.query(createEmailQueueTable);
+    await db.query(createAdminSettingsTable);
 
     // Insert default roles (admin first - highest role)
     const insertDefaultRoles = `
@@ -256,3 +286,68 @@ export async function initializeDatabase() {
 
 // Export the password generation function
 export { generateRandomPassword };
+
+
+// Add these tables after the existing createListingsTable
+
+// Update listings table to include auction fields
+const updateListingsTableForAuctions = `
+  ALTER TABLE listings 
+  ADD COLUMN IF NOT EXISTS is_auction BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS starting_bid DECIMAL(20, 8) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS current_bid DECIMAL(20, 8) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS bid_increment DECIMAL(20, 8) DEFAULT 10.00,
+  ADD COLUMN IF NOT EXISTS auction_end_date TIMESTAMP NULL,
+  ADD COLUMN IF NOT EXISTS auction_winner_id VARCHAR(36) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS auction_status ENUM('active', 'ended', 'cancelled') DEFAULT 'active',
+  ADD FOREIGN KEY (auction_winner_id) REFERENCES users(id)
+`;
+
+// Bids table for tracking all bids
+const createBidsTable = `
+  CREATE TABLE IF NOT EXISTS bids (
+    id VARCHAR(36) PRIMARY KEY,
+    listing_id VARCHAR(36) NOT NULL,
+    bidder_id VARCHAR(36) NOT NULL,
+    bid_amount DECIMAL(20, 8) NOT NULL,
+    wallet_address VARCHAR(255) NOT NULL,
+    chain ENUM('xrp', 'evm', 'solana') NOT NULL,
+    wallet_balance_verified BOOLEAN DEFAULT FALSE,
+    status ENUM('active', 'outbid', 'winning', 'won', 'cancelled') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE,
+    FOREIGN KEY (bidder_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_listing_amount (listing_id, bid_amount DESC),
+    INDEX idx_bidder (bidder_id),
+    INDEX idx_status (status)
+  )
+`;
+
+// Auction payments table for tracking auction completion payments
+const createAuctionPaymentsTable = `
+  CREATE TABLE IF NOT EXISTS auction_payments (
+    id VARCHAR(36) PRIMARY KEY,
+    auction_id VARCHAR(36) NOT NULL,
+    winning_bid_id VARCHAR(36) NOT NULL,
+    winner_id VARCHAR(36) NOT NULL,
+    seller_id VARCHAR(36) NOT NULL,
+    amount DECIMAL(20, 8) NOT NULL,
+    transaction_hash VARCHAR(255),
+    payment_deadline TIMESTAMP NOT NULL,
+    status ENUM('pending', 'paid', 'failed', 'expired') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (auction_id) REFERENCES listings(id),
+    FOREIGN KEY (winning_bid_id) REFERENCES bids(id),
+    FOREIGN KEY (winner_id) REFERENCES users(id),
+    FOREIGN KEY (seller_id) REFERENCES users(id),
+    INDEX idx_status (status),
+    INDEX idx_deadline (payment_deadline)
+  )
+`;
+
+// Add these to your initializeDatabase function:
+await db.query(updateListingsTableForAuctions);
+await db.query(createBidsTable);
+await db.query(createAuctionPaymentsTable);

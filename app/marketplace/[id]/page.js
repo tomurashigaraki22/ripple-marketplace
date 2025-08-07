@@ -62,6 +62,10 @@ export default function ProductDetailPage() {
   const { connection } = useConnection()
 
   const [bidAmount, setBidAmount] = useState("")
+  const [bids, setBids] = useState([])
+  const [timeRemaining, setTimeRemaining] = useState(null)
+  const [selectedQuantity, setSelectedQuantity] = useState(1)
+  const [isPlacingBid, setIsPlacingBid] = useState(false)
   const [shippingInfo, setShippingInfo] = useState({
     address: '',
     city: '',
@@ -103,50 +107,194 @@ export default function ProductDetailPage() {
     }
   }, [user, authLoading, router])
 
-  // Helper function to check if buy button should be shown
-  const shouldShowBuyButton = () => {
-    // Don't show if no wallets connected
-    if (connectedWallets.length === 0) {
-      return false;
-    }
-    
-    // Don't show if listing is sold
-    if (listing?.status === 'sold') {
-      return false;
-    }
-    
-    // Check if at least one connected wallet has a valid price
-const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
-  const walletType = wallet.type === 'xrpl_evm' ? 'evm' : wallet.type;
-  console.log("Wallet Type:", walletType);
+  const fetchListingDetails = async () => {
+    try {
+      setLoading(true)
+      const primaryWallet = connectedWallets.length > 0 ? connectedWallets[0].address : null
+      const url = `/api/marketplace/${params.id}${primaryWallet ? `?wallet=${primaryWallet}` : ''}`
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch listing details')
+      }
 
-  let priceToCheck;
-
-  switch (walletType) {
-    case 'solana':
-      priceToCheck = xrpbPrices?.solana;
-      break;
-    case 'xrp':
-      priceToCheck = xrpbPrices?.xrpl;
-      break;
-    case 'evm':
-      priceToCheck = xrpbPrices?.xrplEvm;
-      break;
-    default:
-      return false;
+      const data = await response.json()
+      setListing(data.listing)
+      
+      // If it's an auction, fetch bids
+      if (data.listing?.is_auction) {
+        await fetchBids()
+      }
+    } catch (error) {
+      console.error('Error fetching listing details:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Ensure the price is not undefined, not 0.0001, and greater than 0
-  return priceToCheck !== undefined && priceToCheck !== 0.0001 && priceToCheck > 0;
-});
+  // Add missing fetchBids function
+  const fetchBids = async () => {
+    try {
+      const response = await fetch(`/api/auctions/${params.id}/bids`)
+      if (response.ok) {
+        const data = await response.json()
+        setBids(data.bids || [])
+      }
+    } catch (error) {
+      console.error('Error fetching bids:', error)
+    }
+  }
+
+  // Enhanced handleBid function
+  const handleBid = async () => {
+    if (!bidAmount || isPlacingBid) return
+    
+    try {
+      setIsPlacingBid(true)
+      
+      // Verify wallet balance first
+      const walletBalance = await verifyWalletBalance(bidAmount)
+      if (!walletBalance.sufficient) {
+        alert(`Insufficient funds. You need at least ${bidAmount} XRPB to place this bid.`)
+        return
+      }
+      
+      const response = await fetch(`/api/auctions/${listing.id}/bid`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          bidAmount: parseFloat(bidAmount),
+          walletAddress: getConnectedWalletAddress(),
+          chain: listing.chain
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok) {
+        // Refresh listing data and bids
+        await fetchListingDetails()
+        await fetchBids()
+        setBidAmount("")
+        alert('Bid placed successfully!')
+      } else {
+        alert(result.error || 'Failed to place bid')
+      }
+    } catch (error) {
+      console.error('Bidding error:', error)
+      alert('Failed to place bid. Please try again.')
+    } finally {
+      setIsPlacingBid(false)
+    }
+  }
+
+  // ... existing code ...
+
+  // Update shouldShowBuyButton to handle stock and auctions
+  const shouldShowBuyButton = () => {
+    if (connectedWallets.length === 0) return false
+    
+    // Don't show if listing is sold or out of stock
+    
+    // Don't show if no stock available
+    if (listing?.stock_quantity !== undefined && listing.stock_quantity <= 0) return false
+    
+    // For auctions, don't show buy button if auction has ended
+    if (listing?.is_auction && !timeRemaining) return false
+    
+    const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
+      const walletType = wallet.type === 'xrpl_evm' ? 'evm' : wallet.type
+      let priceToCheck
+      switch (walletType) {
+        case 'solana': priceToCheck = xrpbPrices?.solana; break
+        case 'xrp': priceToCheck = xrpbPrices?.xrpl; break
+        case 'evm': priceToCheck = xrpbPrices?.xrplEvm; break
+        default: return false
+      }
+      return priceToCheck !== undefined && priceToCheck !== 0.0001 && priceToCheck > 0
+    })
+    
+    return hasValidPriceForConnectedWallet
+  }
+
+  // ... existing code until the return statement ...
+
+
+  // Add this useEffect for auction countdown
+  useEffect(() => {
+    if (listing?.is_auction && listing?.auction_end_date) {
+      const timer = setInterval(() => {
+        const now = new Date().getTime()
+        const endTime = new Date(listing.auction_end_date).getTime()
+        const difference = endTime - now
+        
+        if (difference > 0) {
+          const days = Math.floor(difference / (1000 * 60 * 60 * 24))
+          const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+          const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
+          const seconds = Math.floor((difference % (1000 * 60)) / 1000)
+          
+          setTimeRemaining({ days, hours, minutes, seconds })
+        } else {
+          setTimeRemaining(null)
+          clearInterval(timer)
+        }
+      }, 1000)
+      
+      return () => clearInterval(timer)
+    } else if (listing?.is_auction) {
+      // If auction exists but no end date, auction is active but no timer
+      setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+    }
+  }, [listing])
+
+//   // Helper function to check if buy button should be shown
+//   const shouldShowBuyButton = () => {
+//     // Don't show if no wallets connected
+//     if (connectedWallets.length === 0) {
+//       return false;
+//     }
+    
+//     // Don't show if listing is sold
+//     if (listing?.status === 'sold') {
+//       return false;
+//     }
+    
+//     // Check if at least one connected wallet has a valid price
+// const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
+//   const walletType = wallet.type === 'xrpl_evm' ? 'evm' : wallet.type;
+//   console.log("Wallet Type:", walletType);
+
+//   let priceToCheck;
+
+//   switch (walletType) {
+//     case 'solana':
+//       priceToCheck = xrpbPrices?.solana;
+//       break;
+//     case 'xrp':
+//       priceToCheck = xrpbPrices?.xrpl;
+//       break;
+//     case 'evm':
+//       priceToCheck = xrpbPrices?.xrplEvm;
+//       break;
+//     default:
+//       return false;
+//   }
+
+//   // Ensure the price is not undefined, not 0.0001, and greater than 0
+//   return priceToCheck !== undefined && priceToCheck !== 0.0001 && priceToCheck > 0;
+// });
 
     
-    if (!hasValidPriceForConnectedWallet) {
-      return false;
-    }
+//     if (!hasValidPriceForConnectedWallet) {
+//       return false;
+//     }
     
-    return true;
-  };
+//     return true;
+//   };
   
   // Helper function to render conditional field
   const renderField = (label, value, icon = null) => {
@@ -236,10 +384,9 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
     
     if (connectedWallets.length === 0) {
       return 'Please connect a wallet to make a purchase';
-    }
-    
-    // Check if any prices are available at all
-    const hasAnyValidPrices = Object.values(xrpbPrices).some(price => price && price > 0.0001);
+    }    
+    // Check if any prices are available at all - properly check the values
+    const hasAnyValidPrices = Object.values(xrpbPrices).some(price => price && price !== 0.0001);
     if (!hasAnyValidPrices) {
       return 'Unable to fetch current XRPB prices. Please try again later.';
     }
@@ -315,48 +462,102 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
     }
   }, [params.id, connectedWallets])
 
-  const fetchListingDetails = async () => {
-    try {
-      setLoading(true)
-      // Use the primary wallet (first connected wallet) for API call
-      const primaryWallet = connectedWallets.length > 0 ? connectedWallets[0].address : null
-      const url = `/api/marketplace/${params.id}${primaryWallet ? `?wallet=${primaryWallet}` : ''}`
-      const response = await fetch(url)
+  // const fetchListingDetails = async () => {
+  //   try {
+  //     setLoading(true)
+  //     // Use the primary wallet (first connected wallet) for API call
+  //     const primaryWallet = connectedWallets.length > 0 ? connectedWallets[0].address : null
+  //     const url = `/api/marketplace/${params.id}${primaryWallet ? `?wallet=${primaryWallet}` : ''}`
+  //     const response = await fetch(url)
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch listing details')
-      }
+  //     if (!response.ok) {
+  //       throw new Error('Failed to fetch listing details')
+  //     }
 
-      const data = await response.json()
-      setListing(data.listing)
+  //     const data = await response.json()
+  //     setListing(data.listing)
+  //   } catch (error) {
+  //     console.error('Error fetching listing details:', error)
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
+
+  // Enhanced handleBid function
+  // const handleBid = async () => {
+  //   if (!bidAmount || isPlacingBid) return
+    
+  //   try {
+  //     setIsPlacingBid(true)
+      
+  //     // Verify wallet balance first
+  //     const walletBalance = await verifyWalletBalance(bidAmount)
+  //     if (!walletBalance.sufficient) {
+  //       alert(`Insufficient funds. You need at least ${bidAmount} XRPB to place this bid.`)
+  //       return
+  //     }
+      
+  //     const response = await fetch(`/api/auctions/${listing.id}/bid`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `Bearer ${localStorage.getItem('token')}`
+  //       },
+  //       body: JSON.stringify({
+  //         bidAmount: parseFloat(bidAmount),
+  //         walletAddress: getConnectedWalletAddress(),
+  //         chain: listing.chain
+  //       })
+  //     })
+      
+  //     const result = await response.json()
+      
+  //     if (response.ok) {
+  //       // Refresh listing data and bids
+  //       await fetchListingDetails()
+  //       await fetchBids()
+  //       setBidAmount("")
+  //       alert('Bid placed successfully!')
+  //     } else {
+  //       alert(result.error || 'Failed to place bid')
+  //     }
+  //   } catch (error) {
+  //     console.error('Bidding error:', error)
+  //     alert('Failed to place bid. Please try again.')
+  //   } finally {
+  //     setIsPlacingBid(false)
+  //   }
+  // }
+
+  // Add this function to verify wallet balance
+  const verifyWalletBalance = async (bidAmount) => {
+    try {
+      const walletAddress = connectedWallets.length > 0 ? connectedWallets[0].address : null
+      if (!walletAddress) return { sufficient: false }
+      
+      // Get XRPB price and calculate required amount
+      const xrpbPrice = await getXRPBPriceInUSD()
+      const requiredXRPB = bidAmount / xrpbPrice
+      
+      // Check balance based on chain
+      let balance = 0
+      if (listing.chain === 'xrp') {
+        // Check XRP balance logic
+      } else if (listing.chain === 'evm') {
+        // Check EVM balance logic  
+      } else if (listing.chain === 'solana') {
+        // Check Solana balance logic
+      }
+      
+      return { sufficient: balance >= requiredXRPB, balance, required: requiredXRPB }
     } catch (error) {
-      console.error('Error fetching listing details:', error)
-    } finally {
-      setLoading(false)
+      console.error('Balance verification error:', error)
+      return { sufficient: false }
     }
   }
 
-  const handleBid = async () => {
-    if (connectedWallets.length === 0) {
-      alert("Please connect a wallet to place a bid!")
-      return
-    }
-    if (!bidAmount || Number.parseFloat(bidAmount) <= listing.price) {
-      alert("Bid must be higher than current price!")
-      return
-    }
-    
-    try {
-      setOrderProcessing(true)
-      // Note: Bidding functionality would need a separate implementation
-      // since the current schema doesn't support bid orders
-      alert("Bidding feature coming soon! Please use Buy Now for immediate purchase.")
-    } catch (error) {
-      console.error('Error placing bid:', error)
-      alert('Failed to place bid. Please try again.')
-    } finally {
-      setOrderProcessing(false)
-    }
+  const getConnectedWalletAddress = () => {
+    return connectedWallets.length > 0 ? connectedWallets[0].address : null
   }
 
   const handleBuyNow = async () => {
@@ -1034,7 +1235,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
             </div>
           </div>
 
-          {/* Details Section */}
+{/* Details Section */}
           <div className="space-y-6">
             <div>
               <div className="flex items-center gap-3 mb-4">
@@ -1051,17 +1252,190 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                     Physical Item
                   </span>
                 )}
+                {listing.is_auction && (
+                  <span className="bg-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-sm font-medium">
+                    <Clock className="w-4 h-4 inline mr-1" />
+                    Auction
+                  </span>
+                )}
               </div>
               
               <h1 className="text-3xl font-bold text-white mb-4">{listing.title}</h1>
             </div>
 
-            {/* Price and Seller Info - Updated with XRPB */}
+            {/* Stock Information */}
+            {listing.stock_quantity !== undefined && (
+              <div className="card-glow p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-[#39FF14]" />
+                    <span className="text-white font-medium">Stock Status:</span>
+                  </div>
+                  <div className="text-right">
+                    {listing.stock_quantity > 0 ? (
+                      <>
+                        <span className="text-[#39FF14] font-bold">{listing.stock_quantity} available</span>
+                        {listing.low_stock_threshold && listing.stock_quantity <= listing.low_stock_threshold && (
+                          <p className="text-yellow-400 text-sm">⚠️ Low stock!</p>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-red-400 font-bold">Out of Stock</span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Quantity Selector */}
+                {listing.stock_quantity > 0 && !listing.is_auction && (
+                  <div className="mt-4 flex items-center gap-4">
+                    <label className="text-gray-300">Quantity:</label>
+                    <select 
+                      value={selectedQuantity} 
+                      onChange={(e) => setSelectedQuantity(parseInt(e.target.value))}
+                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white"
+                    >
+                      {[...Array(Math.min(listing.stock_quantity, 10))].map((_, i) => (
+                        <option key={i + 1} value={i + 1}>{i + 1}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Auction Information */}
+            {listing.is_auction && (
+              <div className="card-glow p-6 rounded-lg">
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-purple-400" />
+                  Auction Details
+                </h3>
+                
+                {/* Auction Timer */}
+                {listing.is_auction && (
+                  <div>
+                    {timeRemaining && (timeRemaining.days > 0 || timeRemaining.hours > 0 || timeRemaining.minutes > 0 || timeRemaining.seconds > 0) ? (
+                      <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4 mb-4">
+                        <h4 className="text-purple-400 font-semibold mb-2">Time Remaining</h4>
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          <div>
+                            <div className="text-2xl font-bold text-white">{timeRemaining.days}</div>
+                            <div className="text-xs text-gray-400">Days</div>
+                          </div>
+                          <div>
+                            <div className="text-2xl font-bold text-white">{timeRemaining.hours}</div>
+                            <div className="text-xs text-gray-400">Hours</div>
+                          </div>
+                          <div>
+                            <div className="text-2xl font-bold text-white">{timeRemaining.minutes}</div>
+                            <div className="text-xs text-gray-400">Minutes</div>
+                          </div>
+                          <div>
+                            <div className="text-2xl font-bold text-white">{timeRemaining.seconds}</div>
+                            <div className="text-xs text-gray-400">Seconds</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : listing.auction_end_date ? (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
+                        <p className="text-red-400 font-semibold">Auction Ended</p>
+                      </div>
+                    ) : (
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                        <p className="text-green-400 font-semibold">Auction Active - No End Date Set</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Current Bid Info */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Starting Bid:</span>
+                    <span className="text-white">${listing.starting_bid}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Current Bid:</span>
+                    <span className="text-[#39FF14] font-bold">${listing.current_bid || listing.starting_bid}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Bid Increment:</span>
+                    <span className="text-white">${listing.bid_increment}</span>
+                  </div>
+                  {listing.buy_now_price && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Buy It Now:</span>
+                      <span className="text-yellow-400 font-bold">${listing.buy_now_price}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bidding Interface */}
+                {timeRemaining && connectedWallets.length > 0 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-gray-300 mb-2">Your Bid (USD)</label>
+                      <input
+                        type="number"
+                        value={bidAmount}
+                        onChange={(e) => setBidAmount(e.target.value)}
+                        min={listing.current_bid ? listing.current_bid + listing.bid_increment : listing.starting_bid}
+                        step={listing.bid_increment}
+                        className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"
+                        placeholder={`Minimum: $${listing.current_bid ? listing.current_bid + listing.bid_increment : listing.starting_bid}`}
+                      />
+                    </div>
+                    <button
+                      onClick={handleBid}
+                      disabled={isPlacingBid || !bidAmount}
+                      className={`w-full px-4 py-2 rounded-lg font-semibold ${
+                        isPlacingBid || !bidAmount
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                      }`}
+                    >
+                      {isPlacingBid ? 'Placing Bid...' : 'Place Bid'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Bid History */}
+                {bids.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Bid History
+                    </h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {bids.slice(0, 5).map((bid, index) => (
+                        <div key={bid.id} className="flex justify-between items-center p-2 bg-gray-800/50 rounded">
+                          <span className="text-gray-300 text-sm">
+                            {bid.bidder_username || `${bid.wallet_address.slice(0, 8)}...`}
+                          </span>
+                          <span className="text-[#39FF14] font-semibold">${bid.amount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Price and Seller Info */}
             <div className="card-glow p-6 rounded-lg">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <p className="text-gray-400 text-sm">Current Price</p>
-                  <p className="text-3xl font-bold text-[#39FF14]">{parseFloat(listing.price)} USD {getChainIcon(listing.chain)}</p>
+                  <p className="text-gray-400 text-sm">
+                    {listing.is_auction ? 'Current Bid' : 'Price'}
+                  </p>
+                  <p className="text-3xl font-bold text-[#39FF14]">
+                    ${listing.is_auction ? (listing.current_bid || listing.starting_bid) : listing.price} USD {getChainIcon(listing.chain)}
+                  </p>
+                  {listing.is_auction && listing.buy_now_price && (
+                    <p className="text-yellow-400 text-sm mt-1">
+                      Buy It Now: ${listing.buy_now_price}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-gray-400 text-sm">Seller</p>
@@ -1080,101 +1454,44 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                 </div>
               </div>
 
-              {/* Payment Information - Updated for XRPB */}
-              {listing.paymentInfo ? (
-                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wallet className="w-5 h-5 text-green-400" />
-                    <span className="text-green-400 font-semibold">Payment Ready</span>
-                  </div>
-                  <div className="text-sm text-gray-300 space-y-1">
-                    <p><strong>Your Wallet:</strong> {listing.paymentInfo.buyerWallet}</p>
-                    <p><strong>Seller Wallet:</strong> {listing.paymentInfo.sellerWallet}</p>
-                    <p><strong>Chain:</strong> {listing.paymentInfo.chain.toUpperCase()}</p>
-                    <p><strong>Amount:</strong> {listing.paymentInfo.price} XRPB</p>
-                  </div>
-                </div>
-              ) : connectedWallets.length > 0 ? (
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wallet className="w-5 h-5 text-yellow-400" />
-                    <span className="text-yellow-400 font-semibold">Wallet Connected</span>
-                  </div>
-                  <div className="text-sm text-gray-300 space-y-1">
-                    <p><strong>Connected Wallets:</strong></p>
-                    {connectedWallets.map((wallet, index) => (
-                      <p key={index}>{wallet.icon} {wallet.name}: {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}</p>
-                    ))}
-                    <p className="text-[#39FF14] font-medium mt-2">💰 Payments will be made in XRPB tokens</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wallet className="w-5 h-5 text-red-400" />
-                    <span className="text-red-400 font-semibold">No Wallet Connected</span>
-                  </div>
-                  <p className="text-sm text-gray-300">Connect a wallet to see payment options and make purchases</p>
-                </div>
-              )}
+              {/* ... existing payment info section ... */}
 
-              {/* Available Seller Wallets */}
-              <div className="mb-4">
-                <p className="text-sm text-gray-400 mb-2">Seller accepts XRPB payments on:</p>
-                <div className="flex flex-wrap gap-2">
-                  {listing.seller.wallets.map((wallet, index) => (
-                    <span key={index} className={`px-2 py-1 rounded text-xs ${
-                      wallet.chain === 'xrp' ? 'bg-blue-500/20 text-blue-400' :
-                      wallet.chain === 'evm' ? 'bg-purple-500/20 text-purple-400' :
-                      'bg-green-500/20 text-green-400'
-                    }`}>
-                      {getChainIcon(wallet.chain)} {wallet.chain.toUpperCase()}
-                      {wallet.is_primary && ' (Primary)'}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bid Section - Updated for XRPB */}
-              {/* Remove bidAmount and handleBid function */}
-
+              {/* Action Buttons */}
               {shouldShowBuyButton() && (
                 <div className="grid grid-cols-1 gap-4">
-                  <button
-                    onClick={handleBuyNow}
-                    disabled={orderProcessing}
-                    className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                      orderProcessing
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        : 'bg-[#39FF14] text-black hover:bg-[#39FF14]/90'
-                    }`}
-                  >
-                    {orderProcessing ? 'Processing...' : 
-                     `Buy Now for $${listing?.price} USD (≈${calculatedAmount} XRPB)`}
-                  </button>
+                  {/* Buy Now Button */}
+                  {(!listing.is_auction || listing.buy_now_price) && (
+                    <button
+                      onClick={handleBuyNow}
+                      disabled={orderProcessing}
+                      className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                        orderProcessing
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-[#39FF14] text-black hover:bg-[#39FF14]/90'
+                      }`}
+                    >
+                      {orderProcessing ? 'Processing...' : 
+                       listing.is_auction && listing.buy_now_price
+                         ? `Buy It Now for $${listing.buy_now_price} USD`
+                         : `Buy Now for $${listing.price} USD${selectedQuantity > 1 ? ` (${selectedQuantity} items)` : ''}`}
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* Show message when buy button is hidden */}
-              {!shouldShowBuyButton() && connectedWallets.length === 0 && (
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-                  <p className="text-yellow-400 text-sm text-center">
-                    Connect a wallet to see purchase options
-                  </p>
-                </div>
-              )}
-
-              {!shouldShowBuyButton() && connectedWallets.length > 0 && (
+              {/* Error Messages */}
+              {!shouldShowBuyButton() && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
                   <p className="text-red-400 text-sm text-center">
-                    {getBuyButtonErrorMessage()}
+                    {listing?.status === 'sold' ? 'This item is sold out' :
+                     listing?.status === 'out_of_stock' ? 'This item is out of stock' :
+                     listing?.stock_quantity === 0 ? 'No stock available' :
+                     connectedWallets.length === 0 ? 'Connect a wallet to make a purchase' :
+                     'Unable to fetch current XRPB prices. Please try again later.'}
                   </p>
                 </div>
               )}
             </div>
-
-            {/* ... existing code for stats and bid history ... */}
-          </div>
         </div>
       </div>
 
@@ -1609,15 +1926,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
                 </div>
               )}
 
-              {!shouldShowBuyButton() && connectedWallets.length > 0 && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-                  <p className="text-red-400 text-sm text-center">
-                    {listing?.status === 'sold' 
-                      ? 'This item is sold out'
-                      : 'Unable to fetch current XRPB prices. Please try again later.'}
-                  </p>
-                </div>
-              )}
+
 
       {/* Updated Payment Confirmation Modal */}
       {showPaymentModal && (
@@ -1753,6 +2062,7 @@ const hasValidPriceForConnectedWallet = connectedWallets.some(wallet => {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

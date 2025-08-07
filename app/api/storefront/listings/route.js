@@ -98,7 +98,12 @@ export async function POST(request) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const { title, description, price, category, chain, isPhysical, images, tags } = await request.json()
+    const { 
+      title, description, price, category, chain, isPhysical, images, tags,
+      stock_quantity, low_stock_threshold,
+      // Add auction fields
+      is_auction, starting_bid, bid_increment, auction_end_date, buy_it_now_price
+    } = await request.json()
 
     // Validation
     if (!title || !description || !price || !category || !chain) {
@@ -111,6 +116,69 @@ export async function POST(request) {
     if (price <= 0) {
       return NextResponse.json(
         { error: 'Price must be greater than 0' },
+        { status: 400 }
+      )
+    }
+
+    // Auction-specific validation
+    if (is_auction) {
+      if (!starting_bid || starting_bid <= 0) {
+        return NextResponse.json(
+          { error: 'Starting bid is required for auctions and must be greater than 0' },
+          { status: 400 }
+        )
+      }
+      
+      if (!auction_end_date) {
+        return NextResponse.json(
+          { error: 'Auction end date is required for auctions' },
+          { status: 400 }
+        )
+      }
+      
+      // Validate auction end date is in the future
+      const endDate = new Date(auction_end_date)
+      const now = new Date()
+      if (endDate <= now) {
+        return NextResponse.json(
+          { error: 'Auction end date must be in the future' },
+          { status: 400 }
+        )
+      }
+      
+      // Validate auction duration (minimum 1 hour, maximum 30 days)
+      const timeDiff = endDate.getTime() - now.getTime()
+      const oneHour = 60 * 60 * 1000
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000
+      
+      if (timeDiff < oneHour) {
+        return NextResponse.json(
+          { error: 'Auction must run for at least 1 hour' },
+          { status: 400 }
+        )
+      }
+      
+      if (timeDiff > thirtyDays) {
+        return NextResponse.json(
+          { error: 'Auction cannot run for more than 30 days' },
+          { status: 400 }
+        )
+      }
+      
+      // Validate buy it now price if provided
+      if (buy_it_now_price && buy_it_now_price <= starting_bid) {
+        return NextResponse.json(
+          { error: 'Buy it now price must be higher than starting bid' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validate stock quantity
+    const stockQty = parseInt(stock_quantity) || 1
+    if (stockQty < 1) {
+      return NextResponse.json(
+        { error: 'Stock quantity must be at least 1' },
         { status: 400 }
       )
     }
@@ -152,25 +220,61 @@ export async function POST(request) {
       }
     }
 
-    // Create listing with default status 'pending'
+    // Create listing with auction fields
     const listingId = uuidv4()
-    await db.query(
-      `INSERT INTO listings 
-       (id, user_id, title, description, price, category, chain, is_physical, images, tags, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-      [
-        listingId,
-        authResult.user.id,
-        title,
-        description,
-        parseFloat(price),
-        category,
-        chain,
-        Boolean(isPhysical),
-        JSON.stringify(images),
-        JSON.stringify(processedTags)
-      ]
-    )
+    
+    if (is_auction) {
+      await db.query(
+        `INSERT INTO listings 
+         (id, user_id, title, description, price, category, chain, is_physical, images, tags, 
+          stock_quantity, original_stock, low_stock_threshold, 
+          is_auction, starting_bid, current_bid, bid_increment, auction_end_date, buy_now_price, auction_status, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'pending')`,
+        [
+          listingId,
+          authResult.user.id,
+          title,
+          description,
+          parseFloat(price),
+          category,
+          chain,
+          Boolean(isPhysical),
+          JSON.stringify(images),
+          JSON.stringify(processedTags),
+          stockQty,
+          stockQty,
+          parseInt(low_stock_threshold) || 5,
+          true,
+          parseFloat(starting_bid),
+          parseFloat(starting_bid), // current_bid starts as starting_bid
+          parseFloat(bid_increment) || 10,
+          auction_end_date,
+          buy_it_now_price ? parseFloat(buy_it_now_price) : null
+        ]
+      )
+    } else {
+      await db.query(
+        `INSERT INTO listings 
+         (id, user_id, title, description, price, category, chain, is_physical, images, tags, 
+          stock_quantity, original_stock, low_stock_threshold, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [
+          listingId,
+          authResult.user.id,
+          title,
+          description,
+          parseFloat(price),
+          category,
+          chain,
+          Boolean(isPhysical),
+          JSON.stringify(images),
+          JSON.stringify(processedTags),
+          stockQty,
+          stockQty,
+          parseInt(low_stock_threshold) || 5
+        ]
+      )
+    }
 
     // Fetch the created listing
     const [newListing] = await db.query(
