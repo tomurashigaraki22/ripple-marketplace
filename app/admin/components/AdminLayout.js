@@ -2,7 +2,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Users, Package, CreditCard, BarChart3, Settings, LogOut, Menu, X, Shield, Home } from "lucide-react"
+import { Users, Package, CreditCard, BarChart3, Settings, LogOut, Menu, X, Shield, Home, Mail } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 
 export default function AdminLayout({ children }) {
@@ -18,6 +18,7 @@ export default function AdminLayout({ children }) {
     { name: 'Memberships', href: '/admin/memberships', icon: Shield },
     { name: 'Orders', href: '/admin/orders', icon: CreditCard },
     { name: 'Escrows', href: '/admin/escrows', icon: Shield },
+    { name: 'Emails', href: '/admin/emails', icon: Mail },
     { name: 'Audit Trail', href: '/admin/audit', icon: BarChart3 },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
