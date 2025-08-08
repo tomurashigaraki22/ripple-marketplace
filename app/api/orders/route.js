@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { db } from '../../lib/db.js'
 import { v4 as uuidv4 } from 'uuid'
 import { verifyUserAccess } from '../../utils/auth.js'
+import { sendNewOrderEmail, sendPaymentReceivedEmail, sendLowStockEmail } from '../../lib/emailHelper.js'
 
-// POST - Create a new order (purchase) - Updated with stock management
+// POST - Create a new order (purchase) - Updated with email notifications
 export async function POST(request) {
   try {
     const { listing_id, amount, order_type, buyer_id, shipping_info, escrow_id, transaction_hash, payment_chain, quantity = 1 } = await request.json();
@@ -12,9 +13,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Get listing details with stock info
+    // Get listing details with seller info
     const [listings] = await db.query(
-      'SELECT *, stock_quantity, low_stock_threshold FROM listings WHERE id = ?', 
+      `SELECT l.*, u.email as seller_email, u.username as seller_username 
+       FROM listings l 
+       JOIN users u ON l.user_id = u.id 
+       WHERE l.id = ?`, 
       [listing_id]
     );
     
@@ -74,9 +78,6 @@ export async function POST(request) {
       // Determine new status based on stock
       if (newStockQuantity === 0) {
         newStatus = 'out_of_stock';
-      } else if (newStockQuantity <= listing.low_stock_threshold) {
-        // Keep current status but could trigger low stock notification
-        console.log(`📦 Low stock alert: Listing ${listing_id} has ${newStockQuantity} items remaining`);
       }
 
       await db.query(
@@ -94,7 +95,50 @@ export async function POST(request) {
       // Commit transaction
       await db.query('COMMIT');
       
-      console.log(`📧 Seller notification: New order ${orderId} for listing ${listing_id}. Stock remaining: ${newStockQuantity}`);
+      // Send email notifications after successful transaction
+      try {
+        // 1. Send new order email to seller
+        await sendNewOrderEmail({
+          sellerId: listing.user_id,
+          sellerEmail: listing.seller_email,
+          orderId: orderId,
+          productName: listing.title,
+          quantity: quantity,
+          amount: amount,
+          buyerName: 'Customer', // You might want to get buyer info
+          orderDate: new Date().toLocaleDateString(),
+          shippingRequired: listing.is_physical
+        });
+
+        // 2. Send payment received email if escrow is funded
+        if (escrow_id) {
+          await sendPaymentReceivedEmail({
+            sellerId: listing.user_id,
+            sellerEmail: listing.seller_email,
+            orderId: orderId,
+            amount: amount,
+            productName: listing.title,
+            paymentDate: new Date().toLocaleDateString()
+          });
+        }
+
+        // 3. Send low stock alert if stock is below threshold
+        if (newStockQuantity <= (listing.low_stock_threshold || 2) && newStockQuantity > 0) {
+          await sendLowStockEmail({
+            sellerId: listing.user_id,
+            sellerEmail: listing.seller_email,
+            productName: listing.title,
+            currentStock: newStockQuantity,
+            threshold: listing.low_stock_threshold || 2,
+            listingId: listing_id
+          });
+        }
+
+        console.log(`📧 Email notifications sent for order ${orderId}`);
+      } catch (emailError) {
+        console.error('Email notification error:', emailError);
+        // Don't fail the order if email fails
+      }
 
       return NextResponse.json({ 
         success: true, 

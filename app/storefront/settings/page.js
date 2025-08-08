@@ -15,13 +15,11 @@ export default function StorefrontSettings() {
     // Account Preferences
     language: 'en',
     timezone: 'UTC',
-    currency: 'USD',
     theme: 'dark',
     
     // Notifications
     emailNotifications: {
       newOrders: true,
-      orderUpdates: true,
       paymentReceived: true,
       lowStock: true,
       promotions: false,
@@ -117,7 +115,6 @@ export default function StorefrontSettings() {
     { id: 'account', name: 'Account', icon: Settings },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'privacy', name: 'Privacy & Security', icon: Shield },
-    { id: 'storefront', name: 'Storefront', icon: Globe }
   ]
 
   if (loading) {
@@ -232,7 +229,7 @@ export default function StorefrontSettings() {
                     </div>
 
                     {/* Currency */}
-                    <div>
+                    {/* <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Currency
                       </label>
@@ -246,7 +243,7 @@ export default function StorefrontSettings() {
                         <option value="GBP">GBP (£)</option>
                         <option value="JPY">JPY (¥)</option>
                       </select>
-                    </div>
+                    </div> */}
 
                     {/* Theme */}
                     <div>
@@ -293,7 +290,6 @@ export default function StorefrontSettings() {
                             </label>
                             <p className="text-sm text-gray-500">
                               {key === 'newOrders' && 'Get notified when you receive new orders'}
-                              {key === 'orderUpdates' && 'Updates on order status changes'}
                               {key === 'paymentReceived' && 'Notifications when payments are received'}
                               {key === 'lowStock' && 'Alerts when inventory is running low'}
                               {key === 'promotions' && 'Marketing and promotional emails'}

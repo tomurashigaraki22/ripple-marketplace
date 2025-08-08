@@ -115,9 +115,9 @@ export default function StorefrontAnalytics() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">Total Earnings</p>
-                <p className="text-2xl font-bold text-[#39FF14]">{formatCurrency(analytics.overview.totalEarnings)}</p>
+                <p className="text-2xl font-bold text-[#39FF14]">{analytics.overview.totalEarnings}</p>
               </div>
-              <DollarSign className="w-8 h-8 text-[#39FF14]" />
+              <p className="w-8 h-8 text-[#39FF14]">XRPB</p>
             </div>
           </div>
 

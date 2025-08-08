@@ -181,9 +181,9 @@ export default function StorefrontDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">Total Earnings</p>
-                <p className="text-2xl font-bold text-[#39FF14]">{formatCurrency(stats.totalEarnings)}</p>
+                <p className="text-2xl font-bold text-[#39FF14]">{stats.totalEarnings}</p>
               </div>
-              <DollarSign className="w-8 h-8 text-[#39FF14]" />
+              <p className="w-8 h-8 text-[#39FF14]">XRPB</p>
             </div>
           </div>
         </div>
