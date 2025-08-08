@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '../../../../lib/db.js'
 import jwt from 'jsonwebtoken'
 // Import your existing payment logic
-import { processPayment } from '../../../constructs/payments/buyThings.js'
-
+import { processPayment } from '@/app/constructs/payments/buyThings.js'
 export async function POST(request, { params }) {
   try {
     const { id: auctionId } = params

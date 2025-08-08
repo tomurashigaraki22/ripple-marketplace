@@ -1273,3 +1273,211 @@ export const getAllXRPBPrices = async () => {
     };
   }
 };
+
+/**
+ * Process Payment for Auction Winners
+ * @param {Object} paymentData - Payment configuration object
+ * @param {string} paymentData.auctionId - The auction/listing ID
+ * @param {string} paymentData.winningBidId - The winning bid ID
+ * @param {number} paymentData.amount - Amount to pay (winning bid amount)
+ * @param {string} paymentData.chain - Payment chain (solana, xrpl, xrpl_evm)
+ * @param {Object} paymentData.wallet - Connected wallet object
+ * @param {Object} paymentData.connection - Solana connection (if using Solana)
+ * @param {Object} paymentData.user - Authenticated user object
+ * @param {Object} paymentData.seller - Seller information
+ * @param {Object} paymentData.shippingInfo - Shipping information (if physical item)
+ * @returns {Promise<Object>} Payment result with success status and transaction details
+ */
+export const processPayment = async (paymentData) => {
+  const {
+    auctionId,
+    winningBidId,
+    amount,
+    chain,
+    wallet,
+    connection,
+    user,
+    seller,
+    shippingInfo
+  } = paymentData;
+
+  try {
+    console.log('🎯 AUCTION PAYMENT PROCESSING INITIATED');
+    console.log('Auction ID:', auctionId);
+    console.log('Winning Bid ID:', winningBidId);
+    console.log('Amount:', amount);
+    console.log('Chain:', chain);
+
+    // Validate required parameters
+    if (!auctionId || !winningBidId || !amount || !chain || !wallet || !user) {
+      throw new Error('Missing required payment parameters');
+    }
+
+    // Validate amount
+    const validAmount = Number(amount);
+    if (!validAmount || validAmount <= 0 || isNaN(validAmount) || !Number.isFinite(validAmount)) {
+      throw new Error('Invalid payment amount');
+    }
+
+    // Map chain type for consistency
+    const mappedChain = chain === 'evm' ? 'xrpl_evm' : chain;
+    
+    console.log('🔄 Step 1: Processing blockchain payment...');
+    
+    // Execute payment based on chain type
+    let paymentResult;
+    
+    switch (chain) {
+      case 'solana':
+        if (!connection) {
+          throw new Error('Solana connection required for Solana payments');
+        }
+        paymentResult = await sendSolanaXRPBPayment(wallet, validAmount, connection);
+        break;
+        
+      case 'xrp':
+        paymentResult = await sendXRPLXRPBPayment(wallet, validAmount);
+        break;
+        
+      case 'evm':
+      case 'xrpl_evm':
+        paymentResult = await sendXRPLEvmXRPBPayment(wallet, validAmount);
+        break;
+        
+      default:
+        throw new Error(`Unsupported payment chain: ${chain}`);
+    }
+
+    if (!paymentResult.success) {
+      throw new Error(paymentResult.error || 'Blockchain payment failed');
+    }
+
+    console.log('✅ Blockchain payment successful:', paymentResult.signature || paymentResult.txHash);
+    console.log('🔄 Step 2: Creating escrow record...');
+
+    // Create escrow record for auction payment
+    const escrowResponse = await fetch('/api/escrow', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        seller: seller.wallets?.find(w => w.chain === chain)?.address || 
+                seller.wallets?.[0]?.address || '',
+        buyer: wallet.address,
+        amount: validAmount,
+        chain: mappedChain,
+        conditions: {
+          delivery_required: true,
+          satisfactory_condition: true,
+          auto_release_days: 20
+        },
+        listingId: auctionId,
+        transactionHash: paymentResult.signature || paymentResult.txHash,
+        paymentVerified: true,
+        isAuctionPayment: true,
+        winningBidId: winningBidId
+      })
+    });
+
+    const escrowData = await escrowResponse.json();
+    
+    if (!escrowData.success) {
+      console.error('⚠️ Escrow creation failed but payment was sent:', paymentResult.signature || paymentResult.txHash);
+      throw new Error(escrowData.error || 'Failed to create escrow after payment');
+    }
+
+    console.log('✅ Escrow created successfully:', escrowData.escrowId);
+    console.log('🔄 Step 3: Creating order record...');
+
+    // Create order record for auction purchase
+    const orderData = {
+      listing_id: auctionId,
+      amount: validAmount,
+      order_type: 'auction_purchase',
+      wallet_address: wallet.address,
+      buyer_id: user.id,
+      escrow_id: escrowData.escrowId,
+      transaction_hash: paymentResult.signature || paymentResult.txHash,
+      payment_chain: mappedChain,
+      winning_bid_id: winningBidId
+    };
+
+    // Add shipping info if provided
+    if (shippingInfo) {
+      orderData.shipping_info = shippingInfo;
+    }
+
+    const orderResponse = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    if (!orderResponse.ok) {
+      const orderError = await orderResponse.json();
+      console.error('⚠️ Order creation failed but payment and escrow were successful');
+      throw new Error(orderError.error || 'Failed to create order record');
+    }
+
+    const orderResult = await orderResponse.json();
+    console.log('✅ Order created successfully:', orderResult.order.id);
+
+    console.log('🔄 Step 4: Updating auction payment status...');
+
+    // Update auction payment record to mark as paid
+    const auctionPaymentResponse = await fetch('/api/auctions/payment', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        auctionId: auctionId,
+        winningBidId: winningBidId,
+        transactionHash: paymentResult.signature || paymentResult.txHash,
+        orderId: orderResult.order.id,
+        escrowId: escrowData.escrowId,
+        status: 'paid'
+      })
+    });
+
+    if (!auctionPaymentResponse.ok) {
+      console.warn('⚠️ Failed to update auction payment status, but payment was successful');
+    }
+
+    console.log('✅ AUCTION PAYMENT COMPLETED SUCCESSFULLY!');
+
+    // Return comprehensive success result
+    return {
+      success: true,
+      transactionHash: paymentResult.signature || paymentResult.txHash,
+      orderId: orderResult.order.id,
+      escrowId: escrowData.escrowId,
+      amount: validAmount,
+      chain: mappedChain,
+      paymentData: paymentResult.paymentData,
+      explorerUrl: paymentResult.paymentData?.explorerUrl,
+      message: `Auction payment successful! Order #${orderResult.order.id} created with escrow protection.`
+    };
+
+  } catch (error) {
+    console.error('❌ AUCTION PAYMENT FAILED:', error);
+    
+    return {
+      success: false,
+      error: formatErrorMessage(error.message || error),
+      details: {
+        auctionId,
+        winningBidId,
+        amount,
+        chain,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+};

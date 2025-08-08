@@ -291,17 +291,56 @@ export { generateRandomPassword };
 // Add these tables after the existing createListingsTable
 
 // Update listings table to include auction fields
-const updateListingsTableForAuctions = `
-  ALTER TABLE listings 
-  ADD COLUMN IF NOT EXISTS is_auction BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS starting_bid DECIMAL(20, 8) DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS current_bid DECIMAL(20, 8) DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS bid_increment DECIMAL(20, 8) DEFAULT 10.00,
-  ADD COLUMN IF NOT EXISTS auction_end_date TIMESTAMP NULL,
-  ADD COLUMN IF NOT EXISTS auction_winner_id VARCHAR(36) DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS auction_status ENUM('active', 'ended', 'cancelled') DEFAULT 'active',
-  ADD FOREIGN KEY (auction_winner_id) REFERENCES users(id)
-`;
+const updateListingsTableForAuctions = async () => {
+  try {
+    // Check if columns already exist before adding them
+    const [columns] = await db.query(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'listings' 
+      AND COLUMN_NAME IN ('is_auction', 'starting_bid', 'current_bid', 'bid_increment', 'auction_end_date', 'auction_winner_id', 'auction_status')
+    `);
+    
+    const existingColumns = columns.map(col => col.COLUMN_NAME);
+    
+    // Add columns that don't exist
+    if (!existingColumns.includes('is_auction')) {
+      await db.query('ALTER TABLE listings ADD COLUMN is_auction BOOLEAN DEFAULT FALSE');
+    }
+    if (!existingColumns.includes('starting_bid')) {
+      await db.query('ALTER TABLE listings ADD COLUMN starting_bid DECIMAL(20, 8) DEFAULT NULL');
+    }
+    if (!existingColumns.includes('current_bid')) {
+      await db.query('ALTER TABLE listings ADD COLUMN current_bid DECIMAL(20, 8) DEFAULT NULL');
+    }
+    if (!existingColumns.includes('bid_increment')) {
+      await db.query('ALTER TABLE listings ADD COLUMN bid_increment DECIMAL(20, 8) DEFAULT 10.00');
+    }
+    if (!existingColumns.includes('auction_end_date')) {
+      await db.query('ALTER TABLE listings ADD COLUMN auction_end_date TIMESTAMP NULL');
+    }
+    if (!existingColumns.includes('auction_winner_id')) {
+      await db.query('ALTER TABLE listings ADD COLUMN auction_winner_id VARCHAR(36) DEFAULT NULL');
+    }
+    if (!existingColumns.includes('auction_status')) {
+      await db.query('ALTER TABLE listings ADD COLUMN auction_status ENUM(\'active\', \'ended\', \'cancelled\') DEFAULT \'active\'');
+    }
+    
+    // Add foreign key constraint if auction_winner_id column was just added
+    if (!existingColumns.includes('auction_winner_id')) {
+      try {
+        await db.query('ALTER TABLE listings ADD FOREIGN KEY (auction_winner_id) REFERENCES users(id)');
+      } catch (fkError) {
+        // Foreign key might already exist, ignore error
+        console.log('Foreign key constraint may already exist:', fkError.message);
+      }
+    }
+  } catch (error) {
+    console.error('Error updating listings table for auctions:', error);
+    throw error;
+  }
+};
 
 // Bids table for tracking all bids
 const createBidsTable = `
@@ -348,6 +387,6 @@ const createAuctionPaymentsTable = `
 `;
 
 // Add these to your initializeDatabase function:
-await db.query(updateListingsTableForAuctions);
+await updateListingsTableForAuctions();
 await db.query(createBidsTable);
 await db.query(createAuctionPaymentsTable);
