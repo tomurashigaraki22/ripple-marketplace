@@ -153,12 +153,12 @@ export default function ProductDetailPage() {
       setIsPlacingBid(true)
       
       // Verify wallet balance first
-      // const walletBalance = await verifyWalletBalance(bidAmount)
-      // if (!walletBalance.sufficient) {
-      //   alert(`Insufficient funds. You need at least ${bidAmount} XRPB to place this bid.`)
-      //   console.log("WalletBalance: ", walletBalance)
-      //   return
-      // }
+      const walletBalance = await verifyWalletBalance(bidAmount)
+      if (!walletBalance.sufficient) {
+        alert(`Insufficient funds. You need at least ${bidAmount} XRPB to place this bid.`)
+        console.log("WalletBalance: ", walletBalance)
+        return
+      }
       
       const response = await fetch(`/api/auctions/${listing.id}/bid`, {
         method: 'POST',
