@@ -153,11 +153,12 @@ export default function ProductDetailPage() {
       setIsPlacingBid(true)
       
       // Verify wallet balance first
-      const walletBalance = await verifyWalletBalance(bidAmount)
-      if (!walletBalance.sufficient) {
-        alert(`Insufficient funds. You need at least ${bidAmount} XRPB to place this bid.`)
-        return
-      }
+      // const walletBalance = await verifyWalletBalance(bidAmount)
+      // if (!walletBalance.sufficient) {
+      //   alert(`Insufficient funds. You need at least ${bidAmount} XRPB to place this bid.`)
+      //   console.log("WalletBalance: ", walletBalance)
+      //   return
+      // }
       
       const response = await fetch(`/api/auctions/${listing.id}/bid`, {
         method: 'POST',
@@ -541,18 +542,84 @@ export default function ProductDetailPage() {
       
       // Check balance based on chain
       let balance = 0
+      
       if (listing.chain === 'xrp') {
-        // Check XRP balance logic
+        // Check XRPB balance from XRPL context
+        if (xrpWalletAddress && xrplWallet) {
+          // Use the xrpbBalance from XRPL context
+          const { xrpbBalance } = useXRPL()
+          balance = xrpbBalance || 0
+          
+          // If balance is 0, try to fetch fresh balance
+          if (balance === 0) {
+            const { getXrpbBalance } = useXRPL()
+            balance = await getXrpbBalance(xrpWalletAddress)
+          }
+        }
       } else if (listing.chain === 'evm') {
-        // Check EVM balance logic  
+        // Check EVM balance logic using Metamask context
+        if (metamaskWalletAddress && metamaskConnected && isXRPLEVM) {
+          try {
+            const signer = await getSigner()
+            if (signer) {
+              // You'll need to implement XRPB token contract interaction here
+              // This is a placeholder - you'll need the actual XRPB token contract address and ABI
+              const XRPB_CONTRACT_ADDRESS = '0x6d8630D167458b337A2c8b6242c354d2f4f75D96' // Replace with actual XRPB token contract address
+              const XRPB_ABI = [
+  "function balanceOf(address owner) view returns (uint256)"
+]
+              
+              const { ethers } = require('ethers')
+              const contract = new ethers.Contract(XRPB_CONTRACT_ADDRESS, XRPB_ABI, signer)
+              const balanceWei = await contract.balanceOf(metamaskWalletAddress)
+              balance = parseFloat(ethers.formatEther(balanceWei))
+            }
+          } catch (error) {
+            console.error('Error fetching EVM XRPB balance:', error)
+            balance = 0
+          }
+        }
       } else if (listing.chain === 'solana') {
-        // Check Solana balance logic
+        // Check Solana balance logic using Phantom context
+        if (publicKey && solanaConnected) {
+          try {
+            // You'll need to implement SPL token balance check here
+            // This is a placeholder - you'll need the actual XRPB SPL token mint address
+            const XRPB_MINT_ADDRESS = 'FJLz7hP4EXVMVnRBtP77V4k55t2BfXuajKQp1gcwpump' // Replace with actual XRPB SPL token mint
+            
+            const { getAssociatedTokenAddress, getAccount } = require('@solana/spl-token')
+            const { PublicKey } = require('@solana/web3.js')
+            
+            const mintPublicKey = new PublicKey(XRPB_MINT_ADDRESS)
+            const tokenAccountAddress = await getAssociatedTokenAddress(
+              mintPublicKey,
+              publicKey
+            )
+            
+            try {
+              const tokenAccount = await getAccount(connection, tokenAccountAddress)
+              balance = parseFloat(tokenAccount.amount.toString()) / Math.pow(10, tokenAccount.mint.decimals || 9)
+            } catch (error) {
+              // Token account doesn't exist, balance is 0
+              balance = 0
+            }
+          } catch (error) {
+            console.error('Error fetching Solana XRPB balance:', error)
+            balance = 0
+          }
+        }
       }
       
-      return { sufficient: balance >= requiredXRPB, balance, required: requiredXRPB }
+      return { 
+        sufficient: balance >= requiredXRPB, 
+        balance, 
+        required: requiredXRPB,
+        walletAddress,
+        chain: listing.chain
+      }
     } catch (error) {
       console.error('Balance verification error:', error)
-      return { sufficient: false }
+      return { sufficient: false, error: error.message }
     }
   }
 

@@ -14,12 +14,11 @@ export async function GET(request) {
     }
 
     const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit')) || 50
-    const offset = parseInt(url.searchParams.get('offset')) || 0
     const role = url.searchParams.get('role')
     const membership = url.searchParams.get('membership')
     const search = url.searchParams.get('search')
     const status = url.searchParams.get('status')
+    const getAllUsers = url.searchParams.get('all') === 'true' // New parameter to get all users
 
     let whereClause = 'WHERE 1=1'
     const queryParams = []
@@ -40,8 +39,17 @@ export async function GET(request) {
     }
 
     if (search) {
-      whereClause += ' AND (u.username LIKE ? OR u.email LIKE ?)'
-      queryParams.push(`%${search}%`, `%${search}%`)
+      whereClause += ' AND (u.username LIKE ? OR u.email LIKE ? OR u.id LIKE ?)'
+      queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`)
+    }
+
+    let limitClause = ''
+    if (!getAllUsers) {
+      // Only apply pagination if not requesting all users
+      const limit = parseInt(url.searchParams.get('limit')) || 50
+      const offset = parseInt(url.searchParams.get('offset')) || 0
+      limitClause = 'LIMIT ? OFFSET ?'
+      queryParams.push(limit, offset)
     }
 
     const [users] = await db.query(
@@ -59,25 +67,36 @@ export async function GET(request) {
        JOIN membership_tiers mt ON u.membership_tier_id = mt.id
        ${whereClause}
        ORDER BY u.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...queryParams, limit, offset]
-    )
-
-    // Get total count for pagination
-    const [countResult] = await db.query(
-      `SELECT COUNT(*) as total
-       FROM users u
-       JOIN roles r ON u.role_id = r.id
-       JOIN membership_tiers mt ON u.membership_tier_id = mt.id
-       ${whereClause}`,
+       ${limitClause}`,
       queryParams
     )
 
+    // Get total count for pagination (only if not getting all users)
+    if (!getAllUsers) {
+      const [countResult] = await db.query(
+        `SELECT COUNT(*) as total
+         FROM users u
+         JOIN roles r ON u.role_id = r.id
+         JOIN membership_tiers mt ON u.membership_tier_id = mt.id
+         ${whereClause}`,
+        queryParams.slice(0, -2) // Remove limit and offset from count query
+      )
+
+      const limit = parseInt(url.searchParams.get('limit')) || 50
+      const offset = parseInt(url.searchParams.get('offset')) || 0
+
+      return NextResponse.json({
+        users,
+        total: countResult[0].total,
+        page: Math.floor(offset / limit) + 1,
+        totalPages: Math.ceil(countResult[0].total / limit)
+      })
+    }
+
+    // Return all users without pagination info
     return NextResponse.json({
       users,
-      total: countResult[0].total,
-      page: Math.floor(offset / limit) + 1,
-      totalPages: Math.ceil(countResult[0].total / limit)
+      total: users.length
     })
 
   } catch (error) {

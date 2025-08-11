@@ -40,7 +40,7 @@ export const lowStockTemplate = (data) => {
 
         <!-- Footer -->
         <div style="background: rgba(255, 255, 255, 0.05); padding: 20px 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-          <p style="margin: 0; color: #888888; font-size: 12px;">© 2024 RippleBids. All rights reserved.</p>
+          <p style="margin: 0; color: #888888; font-size: 12px;">© 2025 RippleBids. All rights reserved.</p>
         </div>
       </div>
     </body>

@@ -151,7 +151,7 @@ const sendMembershipGrantedEmail = async (email, membershipData) => {
             <a href="mailto:support@ripplebids.com" style="color: #39FF14; text-decoration: none; margin: 0 15px; font-size: 14px;">📧 support@ripplebids.com</a>
             <a href="https://ripplebids.com" style="color: #39FF14; text-decoration: none; margin: 0 15px; font-size: 14px;">🌐 ripplebids.com</a>
           </div>
-          <p style="color: #666666; margin: 20px 0 0 0; font-size: 12px;">© 2024 RippleBids. All rights reserved.</p>
+          <p style="color: #666666; margin: 20px 0 0 0; font-size: 12px;">© 2025 RippleBids. All rights reserved.</p>
         </div>
       </div>
     `

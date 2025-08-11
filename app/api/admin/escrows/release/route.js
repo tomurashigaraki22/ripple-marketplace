@@ -70,7 +70,7 @@ if (user?.user?.role !== 'admin') {
     }
 
     // Admin release - no fees deducted (full amount)
-    const releaseAmount = parseFloat(escrow.amount)
+    const releaseAmount = parseFloat((escrow.amount * 0.975).toFixed(6))
 
     // Perform blockchain transfer
     let releaseHash
@@ -145,3 +145,240 @@ function determineBlockchainFromTxHash(txHash) {
 // Include all the transfer functions from the original file...
 // (transferFunds, transferSolanaXRPB, transferXRPLXRPB, transferXRPLEvmXRPB)
 // ... [Copy the transfer functions from the original escrow release file]
+
+// Balance checking functions
+async function checkSolanaXRPBBalance(walletAddress) {
+  try {
+    const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+    const walletPublicKey = new PublicKey(walletAddress);
+    const mintPublicKey = new PublicKey(XRPB_TOKENS.solana.mint);
+    
+    const tokenAccount = await getAssociatedTokenAddress(mintPublicKey, walletPublicKey);
+    const balance = await connection.getTokenAccountBalance(tokenAccount);
+    
+    return {
+      balance: balance.value.uiAmount || 0,
+      raw: balance.value.amount
+    };
+  } catch (error) {
+    console.error('Error checking Solana XRPB balance:', error);
+    return { balance: 0, raw: '0' };
+  }
+}
+
+async function checkXRPLXRPBBalance(walletAddress) {
+  try {
+    const client = new Client(process.env.XRPL_RPC_URL || 'wss://xrplcluster.com');
+    await client.connect();
+    
+    const response = await client.request({
+      command: 'account_lines',
+      account: walletAddress,
+      ledger_index: 'validated'
+    });
+    
+    await client.disconnect();
+    
+    const xrpbLine = response.result.lines.find(line => 
+      line.currency === XRPB_TOKENS.xrpl.currency && 
+      line.account === XRPB_TOKENS.xrpl.issuer
+    );
+    
+    return {
+      balance: xrpbLine ? parseFloat(xrpbLine.balance) : 0
+    };
+  } catch (error) {
+    console.error('Error checking XRPL XRPB balance:', error);
+    return { balance: 0 };
+  }
+}
+
+async function checkXRPLEvmBalances(walletAddress) {
+  try {
+    const provider = new ethers.JsonRpcProvider(process.env.XRPL_EVM_RPC_URL || 'https://rpc.xrplevm.org');
+    
+    // Check native XRP balance
+    const nativeBalance = await provider.getBalance(walletAddress);
+    const nativeBalanceFormatted = parseFloat(ethers.formatEther(nativeBalance));
+    
+    // Check XRPB token balance
+    const tokenContract = new ethers.Contract(
+      XRPB_TOKENS.xrplEvm.address,
+      ['function balanceOf(address) view returns (uint256)'],
+      provider
+    );
+    
+    const tokenBalance = await tokenContract.balanceOf(walletAddress);
+    const tokenBalanceFormatted = parseFloat(ethers.formatUnits(tokenBalance, XRPB_TOKENS.xrplEvm.decimals));
+    
+    return {
+      nativeBalance: nativeBalanceFormatted,
+      tokenBalance: tokenBalanceFormatted
+    };
+  } catch (error) {
+    console.error('Error checking XRPL EVM balances:', error);
+    return { nativeBalance: 0, tokenBalance: 0 };
+  }
+}
+
+async function transferFunds(blockchain, toAddress, amount) {
+  console.log(`\n=== ADMIN ESCROW FUND TRANSFER ===`);
+  console.log(`Blockchain: ${blockchain}`);
+  console.log(`To Address: ${toAddress}`);
+  console.log(`Amount: ${amount} XRPB`);
+  
+  // Check balances before transfer
+  let platformWallet;
+  let balanceInfo;
+  
+  switch (blockchain) {
+    case 'solana':
+      // Get platform wallet address from keypair
+      const seedPhrase = process.env.SOLANA_SEED_PHRASE;
+      const seed = bip39.mnemonicToSeedSync(seedPhrase);
+      const derivedSeed = derivePath("m/44'/501'/0'/0'", seed.toString('hex')).key;
+      const fromKeypair = Keypair.fromSeed(derivedSeed);
+      platformWallet = fromKeypair.publicKey.toString();
+      
+      balanceInfo = await checkSolanaXRPBBalance(platformWallet);
+      console.log(`Platform Solana Wallet: ${platformWallet}`);
+      console.log(`XRPB Balance: ${balanceInfo.balance}`);
+      
+      if (balanceInfo.balance < amount) {
+        throw new Error(`Insufficient XRPB balance. Required: ${amount}, Available: ${balanceInfo.balance}`);
+      }
+      
+      return await transferSolanaXRPB(toAddress, amount);
+      
+    case 'xrpl':
+      const xrplWallet = Wallet.fromSeed(PLATFORM_WALLETS.xrpl);
+      platformWallet = xrplWallet.address;
+      
+      balanceInfo = await checkXRPLXRPBBalance(platformWallet);
+      console.log(`Platform XRPL Wallet: ${platformWallet}`);
+      console.log(`XRPB Balance: ${balanceInfo.balance}`);
+      
+      if (balanceInfo.balance < amount) {
+        throw new Error(`Insufficient XRPB balance. Required: ${amount}, Available: ${balanceInfo.balance}`);
+      }
+      
+      return await transferXRPLXRPB(toAddress, amount);
+      
+    case 'xrpl_evm':
+      const provider = new ethers.JsonRpcProvider(process.env.XRPL_EVM_RPC_URL || 'https://rpc.xrplevm.org');
+      const evmWallet = new ethers.Wallet(PLATFORM_WALLETS.xrpl_evm, provider);
+      platformWallet = evmWallet.address;
+      
+      balanceInfo = await checkXRPLEvmBalances(platformWallet);
+      console.log(`Platform XRPL EVM Wallet: ${platformWallet}`);
+      console.log(`Native Balance: ${balanceInfo.nativeBalance} XRP`);
+      console.log(`XRPB Balance: ${balanceInfo.tokenBalance}`);
+      
+      // Check for gas fees (estimate ~0.001 XRP for transaction)
+      if (balanceInfo.nativeBalance < 0.001) {
+        throw new Error(`Insufficient native balance for gas fees. Required: ~0.001 XRP, Available: ${balanceInfo.nativeBalance} XRP`);
+      }
+      
+      if (balanceInfo.tokenBalance < amount) {
+        throw new Error(`Insufficient XRPB balance. Required: ${amount}, Available: ${balanceInfo.tokenBalance}`);
+      }
+      
+      return await transferXRPLEvmXRPB(toAddress, amount);
+      
+    default:
+      throw new Error(`Unsupported blockchain: ${blockchain}`);
+  }
+}
+
+// Solana XRPB transfer using seed phrase
+async function transferSolanaXRPB(toAddress, amount) {
+  try {
+    const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+    
+    // Create keypair from seed phrase
+    const seedPhrase = process.env.SOLANA_SEED_PHRASE;
+    const seed = bip39.mnemonicToSeedSync(seedPhrase);
+    const derivedSeed = derivePath("m/44'/501'/0'/0'", seed.toString('hex')).key;
+    const fromKeypair = Keypair.fromSeed(derivedSeed);
+    
+    const mintPublicKey = new PublicKey(XRPB_TOKENS.solana.mint);
+    const toPublicKey = new PublicKey(toAddress);
+    
+    const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromKeypair.publicKey);
+    const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
+    
+    const amountInSmallestUnit = Math.floor(amount * Math.pow(10, XRPB_TOKENS.solana.decimals));
+    
+    const transaction = new Transaction().add(
+      createTransferInstruction(
+        fromTokenAccount,
+        toTokenAccount,
+        fromKeypair.publicKey,
+        amountInSmallestUnit,
+        [],
+        TOKEN_PROGRAM_ID
+      )
+    );
+    
+    const signature = await connection.sendTransaction(transaction, [fromKeypair]);
+    await connection.confirmTransaction(signature);
+    
+    console.log(`Solana XRPB transfer successful: ${signature}`);
+    return signature;
+  } catch (error) {
+    console.error('Solana XRPB transfer failed:', error);
+    throw error;
+  }
+}
+
+async function transferXRPLXRPB(toAddress, amount) {
+  try {
+    const client = new Client(process.env.XRPL_RPC_URL || 'wss://xrplcluster.com');
+    await client.connect();
+    
+    const wallet = Wallet.fromSeed(PLATFORM_WALLETS.xrpl);
+    
+    const payment = {
+      TransactionType: 'Payment',
+      Account: wallet.address,
+      Destination: toAddress,
+      Amount: {
+        currency: XRPB_TOKENS.xrpl.currency,
+        issuer: XRPB_TOKENS.xrpl.issuer,
+        value: amount.toString()
+      }
+    };
+    
+    const response = await client.submitAndWait(payment, { wallet });
+    await client.disconnect();
+    
+    console.log(`XRPL XRPB transfer successful: ${response.result.hash}`);
+    return response.result.hash;
+  } catch (error) {
+    console.error('XRPL XRPB transfer failed:', error);
+    throw error;
+  }
+}
+
+async function transferXRPLEvmXRPB(toAddress, amount) {
+  try {
+    const provider = new ethers.JsonRpcProvider(process.env.XRPL_EVM_RPC_URL || 'https://rpc.xrplevm.org');
+    const wallet = new ethers.Wallet(PLATFORM_WALLETS.xrpl_evm, provider);
+    
+    const tokenContract = new ethers.Contract(
+      XRPB_TOKENS.xrplEvm.address,
+      ['function transfer(address to, uint256 amount) returns (bool)'],
+      wallet
+    );
+    
+    const amountInSmallestUnit = ethers.parseUnits(amount.toString(), XRPB_TOKENS.xrplEvm.decimals);
+    const tx = await tokenContract.transfer(toAddress, amountInSmallestUnit);
+    const receipt = await tx.wait();
+    
+    console.log(`XRPL EVM XRPB transfer successful: ${receipt.hash}`);
+    return receipt.hash;
+  } catch (error) {
+    console.error('XRPL EVM XRPB transfer failed:', error);
+    throw error;
+  }
+}

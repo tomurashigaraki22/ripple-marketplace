@@ -11,14 +11,17 @@ import { loginAlertTemplate } from './emailTemplates/loginAlertTemplate.js';
 import { lowStockTemplate } from './emailTemplates/lowStockTemplate.js';
 import { paymentReceivedTemplate } from './emailTemplates/paymentReceivedTemplate.js';
 import { promotionalTemplate } from './emailTemplates/promotionalTemplate.js';
+// Import new templates
+import { auctionWinnerTemplate } from './emailTemplates/auctionWinnerTemplate.js'
+import { auctionEndedSellerTemplate } from './emailTemplates/auctionEndedSellerTemplate.js'
 
 // Create nodemailer transporter
 const createTransporter = () =>
   nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD,
     },
     secure: true,
     port: 465,
@@ -55,7 +58,7 @@ export const sendEmail = async ({
       throw new Error(`Invalid email parameters`);
     }
 
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
       throw new Error('Gmail credentials missing');
     }
 
@@ -73,7 +76,7 @@ export const sendEmail = async ({
     const result = await transporter.sendMail({
       from: {
         name: 'RippleBids Marketplace',
-        address: process.env.GMAIL_USER,
+        address: process.env.SMTP_USER,
       },
       to,
       subject,
@@ -100,13 +103,15 @@ const templateMap = {
   loginAlert: loginAlertTemplate,
   escrowReleased: escrowReleasedTemplate,
   storefrontView: storefrontViewTemplate,
-};
+  auctionWinner: auctionWinnerTemplate,
+  auctionEndedSeller: auctionEndedSellerTemplate,
+}
 
-// Email sender wrappers
-const emailWrapper = async (type, subject, template, userKey, emailKey) => async (data) =>
+// Email sender wrappers - Fixed version
+const emailWrapper = (type, subject, template, userKey, emailKey) => async (data) =>
   await sendEmail({
     to: data[emailKey],
-    subject,
+    subject: typeof subject === 'function' ? subject(data) : subject,
     template,
     data,
     userId: data[userKey],
@@ -283,3 +288,22 @@ export const ensureUserSettingsColumn = async () => {
     console.log('Settings column may already exist:', err.message);
   }
 };
+
+// Add new auction email functions
+export const sendAuctionWinnerEmail = emailWrapper(
+  'auctionWinner',
+  (data) => `🎉 Congratulations! You Won the Auction - ${data.auctionTitle}`,
+  auctionWinnerTemplate,
+  'userId',
+  'userEmail'
+)
+
+export const sendAuctionEndedSellerEmail = emailWrapper(
+  'auctionEndedSeller',
+  (data) => data.winningAmount ? 
+    `🎉 Your Auction Sold for $${data.winningAmount} - ${data.auctionTitle}` : 
+    `📋 Your Auction Has Ended - ${data.auctionTitle}`,
+  auctionEndedSellerTemplate,
+  'userId',
+  'userEmail'
+)

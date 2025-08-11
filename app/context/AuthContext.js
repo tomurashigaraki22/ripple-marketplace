@@ -92,12 +92,16 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      // Check for both regular auth token and storefront token
-      const savedToken = localStorage.getItem('authToken') || localStorage.getItem('storefront_token');
+      // Check for auth tokens in priority order
+      const savedToken = localStorage.getItem('authToken') || 
+                        localStorage.getItem('adminToken') || 
+                        localStorage.getItem('storefront_token');
       if (savedToken) {
         const isValid = await validateAndSetUser(savedToken);
         if (!isValid) {
+          // Clear all possible token keys
           localStorage.removeItem('authToken');
+          localStorage.removeItem('adminToken');
           localStorage.removeItem('storefront_token');
           localStorage.removeItem('userData');
         }
@@ -141,7 +145,15 @@ export const AuthProvider = ({ children }) => {
       
       setToken(token);
       setUser(normalizedUser);
-      localStorage.setItem('authToken', token);
+      
+      // Store token with appropriate key based on role
+      if (normalizedUser.role === 'admin') {
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('adminToken', token); // Also store as adminToken for compatibility
+      } else {
+        localStorage.setItem('authToken', token);
+      }
+      
       localStorage.setItem('userData', JSON.stringify(userData)); // Store user data
       return true;
     } catch (error) {
@@ -153,13 +165,30 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setToken(null);
     setUser(null);
+    // Clear all possible token keys
     localStorage.removeItem('authToken');
+    localStorage.removeItem('adminToken');
     localStorage.removeItem('storefront_token');
     localStorage.removeItem('userData'); // Remove stored user data
   };
 
+  // Helper function to get the current valid token
+  const getValidToken = () => {
+    return localStorage.getItem('authToken') || 
+           localStorage.getItem('adminToken') || 
+           localStorage.getItem('storefront_token');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, isTokenExpired }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      token, 
+      login, 
+      logout, 
+      loading, 
+      isTokenExpired, 
+      getValidToken 
+    }}>
       {children}
     </AuthContext.Provider>
   );
