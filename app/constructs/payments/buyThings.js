@@ -7,6 +7,7 @@ import {
 } from '@solana/spl-token';
 import { ethers } from 'ethers';
 import { Client, Wallet, xrpToDrops } from 'xrpl';
+import axios from 'axios';
 
 const isMobile = () =>
   typeof window !== 'undefined' &&
@@ -1167,36 +1168,23 @@ export const getXRPBPriceFromSolana = async () => {
 };
 
 /**
- * Get XRPB price from XRPL using OnTheDex API (returns price in USD)
+ * Get XRPB price from XRPL using internal proxy API (returns price in USD)
  */
 export const getXRPBPriceFromXRPL = async () => {
   try {
-    const response = await fetch('https://s1.xrplmeta.org/token/XRPB:rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    const response = await axios.get('/api/xrpb-price', {
+      timeout: 10000
     });
     
-    if (response.ok) {
-      const data = await response.json();
-      
-      // Check if we have tokens data
-      if (data.meta.token) {
-        const token = data.metrics;
-        console.log("Tokenn: ", token)
-        
-        if (token.price && typeof token.price_usd === 'number') {
-          console.log('✅ XRPB price from OnTheDex API (USD):', token.price);
-          return token.price;
-        }
-      }
+    if (response.status === 200 && response.data.success) {
+      console.log('✅ XRPB price from proxy API (USD):', response.data.price);
+      return response.data.price;
     }
     
-    console.warn('⚠️ Could not fetch XRPB price from OnTheDex API');
+    console.warn('⚠️ Could not fetch XRPB price from proxy API');
     return null;
   } catch (error) {
-    console.error('❌ Error fetching XRPB price from OnTheDex API:', error);
+    console.error('❌ Error fetching XRPB price from proxy API:', error);
     return null;
   }
 };
