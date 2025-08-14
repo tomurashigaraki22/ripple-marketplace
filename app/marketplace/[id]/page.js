@@ -1831,7 +1831,7 @@ export default function ProductDetailPage() {
                       {priceLoadingStates.xrpl ? (
                         <Loader2 className="w-3 h-3 animate-spin ml-1" />
                       ) : (
-                        <span className="text-[#39FF14] ml-1">${xrpbPrices.xrpl.toFixed(9)}</span>
+                        <span className="text-[#39FF14] ml-1">${xrpbPrices?.xrpl?.toFixed(9) || "Null"}</span>
                       )}
                     </div>
                     <div className="flex items-center">

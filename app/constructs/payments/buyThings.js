@@ -1187,6 +1187,7 @@ export const getXRPBPriceFromXRPL = async () => {
       // Check if we have tokens data
       if (data.tokens && Array.isArray(data.tokens) && data.tokens.length > 0) {
         const token = data.tokens[0];
+        console.log("Tokenn: ", token)
         
         if (token.price_usd && typeof token.price_usd === 'number') {
           console.log('✅ XRPB price from OnTheDex API (USD):', token.dex.pairs[0].bid);
