@@ -1171,27 +1171,24 @@ export const getXRPBPriceFromSolana = async () => {
  */
 export const getXRPBPriceFromXRPL = async () => {
   try {
-    const response = await fetch('https://api.onthedex.live/public/v1/aggregator', {
-      method: 'POST',
+    const response = await fetch('https://s1.xrplmeta.org/token/XRPB:rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT', {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        tokens: ['XRPB.rsEaYfqdZKNbD3SK55xzcjPm3nDrMj4aUT']
-      })
+      }
     });
     
     if (response.ok) {
       const data = await response.json();
       
       // Check if we have tokens data
-      if (data.tokens && Array.isArray(data.tokens) && data.tokens.length > 0) {
-        const token = data.tokens[0];
+      if (data.meta.token) {
+        const token = data.metrics;
         console.log("Tokenn: ", token)
         
-        if (token.price_usd && typeof token.price_usd === 'number') {
-          console.log('✅ XRPB price from OnTheDex API (USD):', token.dex.pairs[0].bid);
-          return token.dex.pairs[0].bid;
+        if (token.price && typeof token.price_usd === 'number') {
+          console.log('✅ XRPB price from OnTheDex API (USD):', token.price);
+          return token.price;
         }
       }
     }
