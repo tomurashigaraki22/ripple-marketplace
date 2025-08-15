@@ -5,8 +5,9 @@ import { db } from '../../lib/db.js'
 export async function GET(request) {
   try {
     const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit')) || 20
-    const offset = parseInt(url.searchParams.get('offset')) || 0
+    const limit = parseInt(url.searchParams.get('limit')) || 8 // Changed from 10 to 8
+    const page = parseInt(url.searchParams.get('page')) || 1
+    const offset = (page - 1) * limit
     const category = url.searchParams.get('category')
     const chain = url.searchParams.get('chain')
     const isPhysical = url.searchParams.get('isPhysical')
@@ -87,6 +88,9 @@ export async function GET(request) {
       queryParams
     )
 
+    const total = countResult[0].total
+    const totalPages = Math.ceil(total / limit)
+
     // Format listings
     const formattedListings = listings.map(listing => ({
       ...listing,
@@ -97,10 +101,12 @@ export async function GET(request) {
     return NextResponse.json({
       listings: formattedListings,
       pagination: {
-        total: countResult[0].total,
+        total,
+        totalPages,
+        currentPage: page,
         limit,
-        offset,
-        hasMore: offset + limit < countResult[0].total
+        hasMore: page < totalPages,
+        hasPrevious: page > 1
       }
     })
   } catch (error) {

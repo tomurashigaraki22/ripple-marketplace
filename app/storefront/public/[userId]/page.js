@@ -14,7 +14,10 @@ import {
   Heart,
   Share2,
   ExternalLink,
+  Music,
+  X
 } from "lucide-react"
+import SpotifyWidget from "@/app/components/SpotifyWidget"
 
 export default function PublicStorefront() {
   const params = useParams()
@@ -397,36 +400,88 @@ export default function PublicStorefront() {
   
   // Update the listings grid around line 750
 
-  // Spotify Widget Component
+  // Enhanced Spotify Widget Component
   const SpotifyWidget = () => {
     const spotifySettings = storefrontSettings?.storefrontDesign?.spotifyPlaylist
     
     if (!spotifySettings?.enabled || !spotifySettings?.playlistId) {
       return null
     }
-
-    const { playlistId, position, autoPlay, showCoverArt } = spotifySettings
-
+  
+    const { playlistId, position, autoPlay, showCoverArt, size } = spotifySettings
+  
     const positionClasses = {
       "top-left": "top-4 left-4",
       "top-right": "top-4 right-4",
       "bottom-left": "bottom-4 left-4",
       "bottom-right": "bottom-4 right-4",
     }
-
+  
+    const [isMinimized, setIsMinimized] = useState(true)
+    const [isPlaying, setIsPlaying] = useState(false)
+  
+    // Enhanced embed URL with proper autoplay
+    const embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}?utm_source=generator&theme=0${autoPlay ? '&autoplay=1&auto_play=true' : ''}&show_artwork=${showCoverArt ? 'true' : 'false'}`
+    
+    const widgetHeight = size === 'compact' ? 152 : (showCoverArt ? 380 : 232)
+    const widgetWidth = size === 'compact' ? 300 : 350
+  
     return (
       <div className={`fixed ${positionClasses[position]} z-50`}>
-        <div className="bg-black/80 backdrop-blur-lg border border-gray-700 rounded-2xl p-4 shadow-2xl">
-          <iframe
-            src={`https://open.spotify.com/embed/playlist/${playlistId}?utm_source=generator&theme=0${autoPlay ? "&autoplay=1" : ""}`}
-            width="300"
-            height={showCoverArt ? "380" : "152"}
-            frameBorder="0"
-            allowfullscreen=""
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-            className="rounded-xl"
-          ></iframe>
+        <div className={`bg-black/95 backdrop-blur-xl border border-[#1DB954]/30 rounded-2xl shadow-2xl shadow-[#1DB954]/20 transition-all duration-300 hover:shadow-[#1DB954]/40 ${
+          isMinimized ? 'p-0' : 'p-4'
+        }`}>
+          {/* Minimized state - small button that doesn't stop playback */}
+          {isMinimized && (
+            <button
+              onClick={() => setIsMinimized(false)}
+              className="p-3 flex items-center space-x-2 text-[#1DB954] hover:text-[#1ed760] transition-all duration-300 group hover:bg-[#1DB954]/10 rounded-2xl"
+              title="Expand Spotify Player"
+            >
+              <Music className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium">Spotify</span>
+              {isPlaying && (
+                <div className="w-2 h-2 bg-[#1DB954] rounded-full animate-pulse ml-1"></div>
+              )}
+            </button>
+          )}
+
+          {/* Expanded header */}
+          {!isMinimized && (
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2 text-[#1DB954]">
+                <Music className="w-5 h-5" />
+                <span className="text-sm font-medium">Now Playing</span>
+                {isPlaying && (
+                  <div className="w-2 h-2 bg-[#1DB954] rounded-full animate-pulse"></div>
+                )}
+              </div>
+              <button
+                onClick={() => setIsMinimized(true)}
+                className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg"
+                title="Minimize Player"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Iframe - always rendered but hidden when minimized using display:none */}
+          <div style={{ display: isMinimized ? 'none' : 'block' }}>
+            <iframe
+              src={embedUrl}
+              width={widgetWidth}
+              height={widgetHeight}
+              frameBorder="0"
+              allowTransparency="true"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
+              loading="lazy"
+              className="rounded-xl border border-[#1DB954]/20"
+              onLoad={() => setIsPlaying(true)}
+            />
+          </div>
         </div>
       </div>
     )
@@ -499,7 +554,7 @@ export default function PublicStorefront() {
   return (
     <div className="min-h-screen" style={{ ...getBackgroundStyle(), ...cssVariables }}>
       {/* Spotify Widget */}
-      <SpotifyWidget />
+      <SpotifyWidget/>
 
       {/* Hero Section with Enhanced Glassmorphism */}
       <div className="relative overflow-hidden">

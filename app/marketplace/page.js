@@ -1,9 +1,19 @@
 "use client"
+
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Search, Grid, List, Package, Square, Filter, Clock, Users } from "lucide-react"
-import Image from "next/image"
 import { useParams } from "next/navigation"
+import Link from "next/link"
+import Image from "next/image"
+import {
+  Search,
+  Grid,
+  List,
+  Package,
+  Users,
+  Square,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react"
 
 export default function MarketplacePage() {
   const [viewMode, setViewMode] = useState("grid")
@@ -15,9 +25,14 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
-  const [pagination, setPagination] = useState({ total: 0, hasMore: false })
-  const [currentPage, setCurrentPage] = useState(0)
-  const ITEMS_PER_PAGE = 20
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({ 
+    total: 0, 
+    totalPages: 0, 
+    hasMore: false, 
+    hasPrevious: false 
+  })
+  const ITEMS_PER_PAGE = 8 // Changed from 10 to 8
 
   // Fetch listings from API
   useEffect(() => {
@@ -29,7 +44,7 @@ export default function MarketplacePage() {
       setLoading(true)
       const params = new URLSearchParams({
         limit: ITEMS_PER_PAGE.toString(),
-        offset: (currentPage * ITEMS_PER_PAGE).toString(),
+        page: currentPage.toString(),
         sortBy: sortBy === 'recent' ? 'recent' : sortBy === 'price-low' ? 'price_low' : sortBy === 'price-high' ? 'price_high' : 'recent'
       })
 
@@ -43,13 +58,13 @@ export default function MarketplacePage() {
       
       const data = await response.json()
       
-      if (currentPage === 0) {
-        setListings(data.listings)
-      } else {
-        setListings(prev => [...prev, ...data.listings])
-      }
-      
-      setPagination(data.pagination)
+      setListings(data.listings)
+      setPagination({
+        total: data.pagination.total,
+        totalPages: data.pagination.totalPages,
+        hasMore: data.pagination.hasMore,
+        hasPrevious: data.pagination.hasPrevious
+      })
     } catch (error) {
       console.error('Error fetching listings:', error)
     } finally {
@@ -57,13 +72,13 @@ export default function MarketplacePage() {
     }
   }
 
-  const handleLoadMore = () => {
-    setCurrentPage(prev => prev + 1)
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleFilterChange = () => {
-    setCurrentPage(0)
-    setListings([])
+    setCurrentPage(1)
   }
 
   // Reset page when filters change
@@ -117,6 +132,89 @@ export default function MarketplacePage() {
       default:
         return "bg-gray-500/20 text-gray-400"
     }
+  }
+
+  // Pagination component
+  const PaginationControls = () => {
+    const { totalPages, hasMore, hasPrevious } = pagination
+    
+    const getPageNumbers = () => {
+      const pages = []
+      const maxVisible = 5
+      
+      if (totalPages <= maxVisible) {
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i)
+        }
+      } else {
+        if (currentPage <= 3) {
+          for (let i = 1; i <= 4; i++) pages.push(i)
+          pages.push('...')
+          pages.push(totalPages)
+        } else if (currentPage >= totalPages - 2) {
+          pages.push(1)
+          pages.push('...')
+          for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i)
+        } else {
+          pages.push(1)
+          pages.push('...')
+          for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i)
+          pages.push('...')
+          pages.push(totalPages)
+        }
+      }
+      
+      return pages
+    }
+
+    if (totalPages <= 1) return null
+
+    return (
+      <div className="flex items-center justify-center space-x-2 mt-12">
+        {/* Previous Button - Fixed visibility */}
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={!hasPrevious}
+          className="flex items-center px-4 py-2 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-medium hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:bg-gray-900/50 min-w-[100px] justify-center"
+        >
+          <ChevronLeft className="w-4 h-4 mr-1" />
+          <span>Previous</span>
+        </button>
+
+        {/* Page Numbers */}
+        <div className="flex items-center space-x-1">
+          {getPageNumbers().map((page, index) => (
+            page === '...' ? (
+              <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-400">
+                ...
+              </span>
+            ) : (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 min-w-[40px] ${
+                  currentPage === page
+                    ? 'bg-[#39FF14] text-black'
+                    : 'bg-gray-900/50 border border-gray-700 text-white hover:border-[#39FF14] hover:bg-[#39FF14]/10'
+                }`}
+              >
+                {page}
+              </button>
+            )
+          ))}
+        </div>
+
+        {/* Next Button - Fixed visibility */}
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={!hasMore}
+          className="flex items-center px-4 py-2 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-medium hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:bg-gray-900/50 min-w-[100px] justify-center"
+        >
+          <span>Next</span>
+          <ChevronRight className="w-4 h-4 ml-1" />
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -252,6 +350,11 @@ export default function MarketplacePage() {
             <p className="text-gray-400">
               <span className="text-white font-semibold">{listings.length}</span> of{" "}
               <span className="text-white font-semibold">{pagination.total}</span> items
+              {pagination.totalPages > 1 && (
+                <span className="ml-2">
+                  (Page {pagination.currentPage} of {pagination.totalPages})
+                </span>
+              )}
             </p>
             {(selectedChain !== "all" || selectedCategory !== "all" || itemType !== "all" || searchQuery) && (
               <button
@@ -270,7 +373,7 @@ export default function MarketplacePage() {
         </div>
 
         {/* Loading State */}
-        {loading && listings.length === 0 && (
+        {loading && (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#39FF14]"></div>
           </div>
@@ -362,18 +465,8 @@ export default function MarketplacePage() {
           ))}
         </div>
 
-        {/* Load More Section */}
-        {pagination.hasMore && (
-          <div className="text-center">
-            <button 
-              onClick={handleLoadMore}
-              disabled={loading}
-              className="px-8 py-4 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-semibold hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Loading...' : 'Load More Items'}
-            </button>
-          </div>
-        )}
+        {/* Pagination Controls */}
+        <PaginationControls />
 
         {/* Empty State */}
         {!loading && listings.length === 0 && (

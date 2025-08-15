@@ -20,7 +20,8 @@ import {
   Sparkles,
   Store,
   Grid,
-  Sliders
+  Sliders,
+  Music
 } from "lucide-react"
 
 export default function StorefrontSettings() {
@@ -154,6 +155,16 @@ export default function StorefrontSettings() {
           discord: "",
           website: ""
         }
+      },
+      
+      // Spotify Integration
+      spotifyPlaylist: {
+        enabled: false,
+        playlistId: "",
+        position: "bottom-right", // top-left, top-right, bottom-left, bottom-right
+        autoPlay: false,
+        showCoverArt: true,
+        size: "compact" // compact, full
       }
     }
   }
@@ -516,6 +527,32 @@ const LivePreview = () => {
     }
   }
   
+  const SpotifyPreviewWidget = () => {
+    const spotifySettings = storefrontDesign.spotifyPlaylist
+    
+    if (!spotifySettings?.enabled || !spotifySettings?.playlistId) {
+      return null
+    }
+
+    const positionClasses = {
+      "top-left": "top-2 left-2",
+      "top-right": "top-2 right-2",
+      "bottom-left": "bottom-2 left-2",
+      "bottom-right": "bottom-2 right-2",
+    }
+
+    return (
+      <div className={`absolute ${positionClasses[spotifySettings.position]} z-20`}>
+        <div className="bg-black/80 backdrop-blur-lg border border-gray-700 rounded-lg p-2 shadow-xl">
+          <div className="flex items-center space-x-2 text-[#1DB954]">
+            <Music className="w-4 h-4" />
+            <span className="text-xs font-medium">Spotify</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Enhanced Preview Header */}
@@ -596,6 +633,9 @@ const LivePreview = () => {
             {effects.glassmorphism?.enabled && (
               <div className={`absolute inset-0 backdrop-blur-${effects.glassmorphism?.blur || 'md'} bg-white/5 border border-white/10`} />
             )}
+
+            {/* Spotify Widget Preview */}
+            <SpotifyPreviewWidget />
 
             {/* Enhanced Preview Content */}
             <div className="relative z-10 p-6 h-full flex flex-col">
@@ -866,7 +906,8 @@ const LivePreview = () => {
       { id: 'background', name: 'Background', icon: ImageIcon },
       { id: 'typography', name: 'Typography', icon: Type },
       { id: 'layout', name: 'Layout & Effects', icon: Layout },
-      { id: 'branding', name: 'Logo & Branding', icon: Store }
+      { id: 'branding', name: 'Logo & Branding', icon: Store },
+      { id: 'spotify', name: 'Spotify', icon: Music }
     ]
 
     return (
@@ -906,6 +947,7 @@ const LivePreview = () => {
             {activeDesignSection === 'typography' && <TypographySection />}
             {activeDesignSection === 'layout' && <LayoutSection />}
             {activeDesignSection === 'branding' && <BrandingSection />}
+            {activeDesignSection === 'spotify' && <SpotifySection />}
           </div>
         </div>
 
@@ -1501,6 +1543,152 @@ const LivePreview = () => {
             )
           })}
         </div>
+      </div>
+    </div>
+  )
+
+  // Spotify Section Component
+  const SpotifySection = () => (
+    <div className="space-y-8">
+      <h3 className="text-2xl font-bold text-white flex items-center space-x-3">
+        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+          <Music className="w-4 h-4 text-white" />
+        </div>
+        <span className="bg-gradient-to-r from-white to-green-400 bg-clip-text text-transparent">Spotify Integration</span>
+      </h3>
+      
+      <div className="bg-black/30 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+        {/* Enable Spotify */}
+        <div className="mb-6">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <button
+              onClick={() => handleChange('storefrontDesign.spotifyPlaylist.enabled', !settings.storefrontDesign?.spotifyPlaylist?.enabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                settings.storefrontDesign?.spotifyPlaylist?.enabled ? 'bg-[#39FF14]' : 'bg-gray-600'
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.storefrontDesign?.spotifyPlaylist?.enabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+            <span className="text-white font-medium">Enable Spotify Widget</span>
+          </label>
+          <p className="text-gray-400 text-sm mt-1 ml-8">Show a Spotify playlist widget on your storefront</p>
+        </div>
+
+        {settings.storefrontDesign?.spotifyPlaylist?.enabled && (
+          <>
+            {/* Playlist ID */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Spotify Playlist ID
+              </label>
+              <input
+                type="text"
+                value={settings.storefrontDesign?.spotifyPlaylist?.playlistId || ""}
+                onChange={(e) => handleChange('storefrontDesign.spotifyPlaylist.playlistId', e.target.value)}
+                placeholder="e.g., 37i9dQZF1DXcBWIGoYBM5M"
+                className="w-full px-4 py-3 bg-black/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none focus:ring-2 focus:ring-[#39FF14]/20"
+              />
+              <p className="text-gray-400 text-sm mt-1">
+                Get the playlist ID from the Spotify URL: spotify.com/playlist/<strong>PLAYLIST_ID</strong>
+              </p>
+            </div>
+
+            {/* Position */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Widget Position
+              </label>
+              <select
+                value={settings.storefrontDesign?.spotifyPlaylist?.position || "bottom-right"}
+                onChange={(e) => handleChange('storefrontDesign.spotifyPlaylist.position', e.target.value)}
+                className="w-full px-4 py-3 bg-black/50 border border-gray-600 rounded-xl text-white focus:border-[#39FF14] focus:outline-none focus:ring-2 focus:ring-[#39FF14]/20"
+              >
+                <option value="top-left">Top Left</option>
+                <option value="top-right">Top Right</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-right">Bottom Right</option>
+              </select>
+            </div>
+
+            {/* Widget Size */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Widget Size
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { value: 'compact', label: 'Compact', desc: 'Smaller widget with minimal controls' },
+                  { value: 'full', label: 'Full', desc: 'Larger widget with all controls' }
+                ].map(size => (
+                  <button
+                    key={size.value}
+                    onClick={() => handleChange('storefrontDesign.spotifyPlaylist.size', size.value)}
+                    className={`p-4 rounded-xl border text-left transition-all duration-300 transform hover:scale-105 ${
+                      settings.storefrontDesign?.spotifyPlaylist?.size === size.value
+                        ? 'border-[#39FF14] bg-[#39FF14]/20 text-[#39FF14]'
+                        : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500 hover:text-white'
+                    }`}
+                  >
+                    <div className="font-medium">{size.label}</div>
+                    <div className="text-xs text-gray-400 mt-1">{size.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Widget Options */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="flex items-center space-x-3 cursor-pointer">
+                <button
+                  onClick={() => handleChange('storefrontDesign.spotifyPlaylist.autoPlay', !settings.storefrontDesign?.spotifyPlaylist?.autoPlay)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    settings.storefrontDesign?.spotifyPlaylist?.autoPlay ? 'bg-[#39FF14]' : 'bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings.storefrontDesign?.spotifyPlaylist?.autoPlay ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+                <span className="text-white">Auto Play</span>
+              </div>
+              
+              <div className="flex items-center space-x-3 cursor-pointer">
+                <button
+                  onClick={() => handleChange('storefrontDesign.spotifyPlaylist.showCoverArt', !settings.storefrontDesign?.spotifyPlaylist?.showCoverArt)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    settings.storefrontDesign?.spotifyPlaylist?.showCoverArt ? 'bg-[#39FF14]' : 'bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings.storefrontDesign?.spotifyPlaylist?.showCoverArt ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+                <span className="text-white">Show Cover Art</span>
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="mt-8 border border-gray-600 rounded-xl p-4 bg-black/50">
+              <h4 className="text-white font-medium mb-3 flex items-center space-x-2">
+                <Eye className="w-4 h-4 text-[#39FF14]" />
+                <span>Widget Preview</span>
+              </h4>
+              <div className={`w-full ${settings.storefrontDesign?.spotifyPlaylist?.size === 'compact' ? 'h-20' : 'h-80'} bg-black rounded-lg flex items-center justify-center border border-green-500/30`}>
+                <div className="text-center">
+                  <Music className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                  <p className="text-green-500 text-sm">Spotify Player</p>
+                  {settings.storefrontDesign?.spotifyPlaylist?.playlistId ? (
+                    <p className="text-gray-400 text-xs mt-2">Playlist ID: {settings.storefrontDesign?.spotifyPlaylist?.playlistId}</p>
+                  ) : (
+                    <p className="text-gray-400 text-xs mt-2">Enter a playlist ID to preview</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
