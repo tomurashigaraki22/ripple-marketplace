@@ -70,6 +70,92 @@ export async function GET(request) {
         start: '09:00',
         end: '17:00',
         timezone: 'UTC'
+      },
+      // FIXED: Changed from 'storefrontCustomization' to 'storefrontDesign'
+      storefrontDesign: {
+        colorScheme: "neon-dark",
+        customColors: {
+          primary: "#39FF14",
+          secondary: "#10b981",
+          accent: "#3b82f6",
+          background: "#000000",
+          surface: "#1a1a1a",
+          text: "#ffffff",
+          textSecondary: "#d1d5db",
+          border: "#4b5563"
+        },
+        backgroundType: "gradient",
+        backgroundColor: "#000000",
+        gradientColors: {
+          from: "#1a1a1a",
+          to: "#000000",
+          direction: "to-br"
+        },
+        backgroundImage: {
+          url: "",
+          opacity: 0.3,
+          blur: 0
+        },
+        typography: {
+          fontFamily: "inter",
+          headingFont: "inter",
+          fontSize: {
+            heading: 48,
+            subheading: 24,
+            body: 16,
+            small: 14
+          },
+          fontWeight: {
+            heading: "bold",
+            body: "normal"
+          }
+        },
+        layout: {
+          containerWidth: "full",
+          spacing: "normal",
+          borderRadius: "xl",
+          gridColumns: {
+            mobile: 1,
+            tablet: 2,
+            desktop: 4
+          }
+        },
+        effects: {
+          glassmorphism: {
+            enabled: true,
+            intensity: "medium",
+            blur: "md"
+          },
+          animations: {
+            enabled: true,
+            cardHover: "scale",
+            pageTransition: "fade"
+          },
+          shadows: {
+            cards: "lg",
+            buttons: "md"
+          }
+        },
+        header: {
+          style: "floating",
+          showAvatar: true,
+          showStats: true,
+          height: "normal"
+        },
+        branding: {
+          logo: {
+            url: "",
+            size: "medium",
+            position: "header"
+          },
+          favicon: "",
+          socialLinks: {
+            twitter: "",
+            instagram: "",
+            discord: "",
+            website: ""
+          }
+        }
       }
     }
 
@@ -109,7 +195,8 @@ export async function PUT(request) {
       'profileVisibility', 'showEmail', 'showPhone',
       'twoFactorAuth', 'loginAlerts',
       'autoAcceptOrders', 'showInventoryCount',
-      'allowOffers', 'requireBuyerMessage', 'businessHours'
+      'allowOffers', 'requireBuyerMessage', 'businessHours',
+      'storefrontDesign' // FIXED: Changed from 'storefrontCustomization' to 'storefrontDesign'
     ]
 
     const filteredSettings = {}
