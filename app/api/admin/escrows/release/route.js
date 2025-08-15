@@ -9,6 +9,7 @@ import { ethers } from 'ethers'
 import { Client, Wallet, xrpToDrops } from 'xrpl'
 import * as bip39 from 'bip39'
 import { derivePath } from 'ed25519-hd-key'
+import { logAuditAction, getClientIP, getUserAgent, AUDIT_ACTIONS, TARGET_TYPES } from '../../../../utils/auditLogger.js'
 
 // XRPB Token configurations (same as original)
 const XRPB_TOKENS = {
@@ -91,23 +92,20 @@ if (user?.user?.role !== 'admin') {
 
     // Create audit trail entry
     const auditId = uuidv4()
-    await db.query(
-      'INSERT INTO audit_trail (id, admin_id, action, target_type, target_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-      [
-        auditId,
-        user.id,
-        'admin_escrow_release',
-        'escrow',
-        escrowId,
-        JSON.stringify({
-          escrow_id: escrowId,
-          amount: releaseAmount,
-          withdrawal_address: withdrawalAddress,
-          release_hash: releaseHash,
-          blockchain: blockchain
-        })
-      ]
-    )
+   await logAuditAction({
+  adminId: user.id,
+  action: AUDIT_ACTIONS.ESCROW_RELEASED,
+  targetType: TARGET_TYPES.ESCROW,
+  targetId: escrowId,
+  details: {
+    escrowAmount: escrow.amount,
+    blockchain,
+    releaseAmount,
+    releaseReason: 'Admin manual release'
+  },
+  ipAddress: getClientIP(request),
+  userAgent: getUserAgent(request)
+})
 
     return NextResponse.json({
       success: true,
@@ -382,3 +380,7 @@ async function transferXRPLEvmXRPB(toAddress, amount) {
     throw error;
   }
 }
+
+// In the POST function, replace the existing audit trail code with:
+
+// Log audit action using the new helper

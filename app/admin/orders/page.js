@@ -357,7 +357,7 @@ export default function AdminOrders() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-green-400">
-                        {formatCurrency(order.amount)}
+                        {order.amount} XRPB
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Settings, Shield, Globe, Bell, Database, Key, Save, RefreshCw } from "lucide-react"
+import { Settings, Shield, Globe, Bell, Database, Key, Save, RefreshCw, CheckCircle, AlertCircle } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { useRouter } from "next/navigation"
 import AdminLayout from "../components/AdminLayout"
@@ -9,36 +9,14 @@ export default function AdminSettings() {
   const [settings, setSettings] = useState({
     general: {
       siteName: 'RippleBids',
-      siteDescription: 'Decentralized Marketplace',
-      maintenanceMode: false,
-      registrationEnabled: true
+      siteDescription: 'Decentralized Marketplace'
     },
-    security: {
-      twoFactorRequired: false,
-      sessionTimeout: 24,
-      maxLoginAttempts: 5,
-      passwordMinLength: 8
-    },
-    notifications: {
-      emailNotifications: true,
-      smsNotifications: false,
-      pushNotifications: true,
-      adminAlerts: true
-    },
-    blockchain: {
-      xrpNetwork: 'mainnet',
-      evmNetwork: 'ethereum',
-      solanaNetwork: 'mainnet-beta',
-      gasLimits: {
-        xrp: 1000000,
-        evm: 21000,
-        solana: 200000
-      }
-    }
   })
   const [activeTab, setActiveTab] = useState('general')
   const [saving, setSaving] = useState(false)
-  const { user } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [notification, setNotification] = useState({ show: false, type: '', message: '' })
+  const { user, token } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -46,16 +24,42 @@ export default function AdminSettings() {
       router.push('/admin/login')
       return
     }
-    fetchSettings()
-  }, [user, router])
+    if (user && token) {
+      fetchSettings()
+    }
+  }, [user, token, router])
+
+  const showNotification = (type, message) => {
+    setNotification({ show: true, type, message })
+    setTimeout(() => setNotification({ show: false, type: '', message: '' }), 5000)
+  }
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/admin/settings')
+      setLoading(true)
+      const response = await fetch('/api/admin/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.status === 401) {
+        router.push('/admin/login')
+        return
+      }
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch settings')
+      }
+      
       const data = await response.json()
       setSettings(data.settings || settings)
     } catch (error) {
       console.error('Failed to fetch settings:', error)
+      showNotification('error', 'Failed to load settings')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -64,24 +68,33 @@ export default function AdminSettings() {
     try {
       const response = await fetch('/api/admin/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(settings)
       })
-      if (response.ok) {
-        // Show success message
+      
+      if (response.status === 401) {
+        router.push('/admin/login')
+        return
       }
+      
+      if (!response.ok) {
+        throw new Error('Failed to save settings')
+      }
+      
+      showNotification('success', 'Settings saved successfully!')
     } catch (error) {
       console.error('Failed to save settings:', error)
+      showNotification('error', 'Failed to save settings')
     } finally {
       setSaving(false)
     }
   }
 
   const tabs = [
-    { id: 'general', name: 'General', icon: Globe },
-    { id: 'security', name: 'Security', icon: Shield },
-    { id: 'notifications', name: 'Notifications', icon: Bell },
-    { id: 'blockchain', name: 'Blockchain', icon: Database }
+    { id: 'general', name: 'General', icon: Globe }
   ]
 
   const updateSetting = (category, key, value) => {
@@ -94,9 +107,46 @@ export default function AdminSettings() {
     }))
   }
 
+  const updateNestedSetting = (category, parentKey, key, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [parentKey]: {
+          ...prev[category][parentKey],
+          [key]: value
+        }
+      }
+    }))
+  }
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="w-8 h-8 animate-spin text-[#39FF14]" />
+        </div>
+      </AdminLayout>
+    )
+  }
+
   return (
     <AdminLayout>
       <div className="space-y-8">
+        {/* Notification */}
+        {notification.show && (
+          <div className={`fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 rounded-lg shadow-lg ${
+            notification.type === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
+            'bg-red-500/20 text-red-400 border border-red-500/30'
+          }`}>
+            {notification.type === 'success' ? 
+              <CheckCircle className="w-5 h-5" /> : 
+              <AlertCircle className="w-5 h-5" />
+            }
+            <span>{notification.message}</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -166,7 +216,7 @@ export default function AdminSettings() {
                     </div>
                   </div>
                   
-                  <div className="space-y-4">
+                  {/* <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
                       <div>
                         <h4 className="text-white font-medium">Maintenance Mode</h4>
@@ -198,7 +248,7 @@ export default function AdminSettings() {
                         <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
                       </label>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               )}
 
@@ -227,6 +277,16 @@ export default function AdminSettings() {
                         className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
                       />
                     </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">Password Min Length</label>
+                      <input
+                        type="number"
+                        value={settings.security.passwordMinLength}
+                        onChange={(e) => updateSetting('security', 'passwordMinLength', parseInt(e.target.value))}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -249,7 +309,162 @@ export default function AdminSettings() {
                 </div>
               )}
 
-              {/* Add other tab contents similarly */}
+              {/* Notifications Settings */}
+              {activeTab === 'notifications' && (
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-white mb-6">Notification Settings</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
+                      <div>
+                        <h4 className="text-white font-medium">Email Notifications</h4>
+                        <p className="text-gray-400 text-sm">Send notifications via email</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settings.notifications.emailNotifications}
+                          onChange={(e) => updateSetting('notifications', 'emailNotifications', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
+                      <div>
+                        <h4 className="text-white font-medium">SMS Notifications</h4>
+                        <p className="text-gray-400 text-sm">Send notifications via SMS</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settings.notifications.smsNotifications}
+                          onChange={(e) => updateSetting('notifications', 'smsNotifications', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
+                      <div>
+                        <h4 className="text-white font-medium">Push Notifications</h4>
+                        <p className="text-gray-400 text-sm">Send browser push notifications</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settings.notifications.pushNotifications}
+                          onChange={(e) => updateSetting('notifications', 'pushNotifications', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
+                      <div>
+                        <h4 className="text-white font-medium">Admin Alerts</h4>
+                        <p className="text-gray-400 text-sm">Receive alerts for admin actions</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settings.notifications.adminAlerts}
+                          onChange={(e) => updateSetting('notifications', 'adminAlerts', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#39FF14]"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Blockchain Settings */}
+              {activeTab === 'blockchain' && (
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-white mb-6">Blockchain Settings</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">XRP Network</label>
+                      <select
+                        value={settings.blockchain.xrpNetwork}
+                        onChange={(e) => updateSetting('blockchain', 'xrpNetwork', e.target.value)}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                      >
+                        <option value="mainnet">Mainnet</option>
+                        <option value="testnet">Testnet</option>
+                        <option value="devnet">Devnet</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">EVM Network</label>
+                      <select
+                        value={settings.blockchain.evmNetwork}
+                        onChange={(e) => updateSetting('blockchain', 'evmNetwork', e.target.value)}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                      >
+                        <option value="ethereum">Ethereum</option>
+                        <option value="polygon">Polygon</option>
+                        <option value="bsc">BSC</option>
+                        <option value="arbitrum">Arbitrum</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white mb-2">Solana Network</label>
+                      <select
+                        value={settings.blockchain.solanaNetwork}
+                        onChange={(e) => updateSetting('blockchain', 'solanaNetwork', e.target.value)}
+                        className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                      >
+                        <option value="mainnet-beta">Mainnet</option>
+                        <option value="testnet">Testnet</option>
+                        <option value="devnet">Devnet</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-lg font-semibold text-white mb-4">Gas Limits</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-white mb-2">XRP Gas Limit</label>
+                        <input
+                          type="number"
+                          value={settings.blockchain.gasLimits.xrp}
+                          onChange={(e) => updateNestedSetting('blockchain', 'gasLimits', 'xrp', parseInt(e.target.value))}
+                          className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-white mb-2">EVM Gas Limit</label>
+                        <input
+                          type="number"
+                          value={settings.blockchain.gasLimits.evm}
+                          onChange={(e) => updateNestedSetting('blockchain', 'gasLimits', 'evm', parseInt(e.target.value))}
+                          className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-white mb-2">Solana Gas Limit</label>
+                        <input
+                          type="number"
+                          value={settings.blockchain.gasLimits.solana}
+                          onChange={(e) => updateNestedSetting('blockchain', 'gasLimits', 'solana', parseInt(e.target.value))}
+                          className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

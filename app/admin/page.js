@@ -66,7 +66,6 @@ export default function AdminPage() {
     { id: "dashboard", label: "Dashboard" },
     { id: "create", label: "Create Listing" },
     { id: "manage", label: "Manage Listings" },
-    { id: "analytics", label: "Analytics" },
   ]
 
   return (

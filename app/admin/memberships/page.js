@@ -25,6 +25,9 @@ export default function AdminMemberships() {
     tierName: 'pro',
     months: 1
   })
+  // Add new state for user search in grant modal
+  const [userSearchTerm, setUserSearchTerm] = useState("")
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [isGranting, setIsGranting] = useState(false)
   const { user, token } = useAuth()
   const router = useRouter()
@@ -89,7 +92,8 @@ export default function AdminMemberships() {
 
   const fetchAllUsers = async () => {
     try {
-      const response = await fetch('/api/admin/users', {
+      // Add 'all=true' parameter to get all users without pagination
+      const response = await fetch('/api/admin/users?all=true', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -137,6 +141,19 @@ export default function AdminMemberships() {
       setIsGranting(false)
     }
   }
+
+  // Add filtered users for grant modal (MOVE INSIDE COMPONENT)
+  const filteredUsersForGrant = allUsers.filter(user => {
+    const searchLower = userSearchTerm.toLowerCase()
+    return userSearchTerm === "" || 
+           user.username?.toLowerCase().includes(searchLower) ||
+           user.email?.toLowerCase().includes(searchLower) ||
+           user.first_name?.toLowerCase().includes(searchLower) ||
+           user.last_name?.toLowerCase().includes(searchLower)
+  })
+
+  // Get selected user details (MOVE INSIDE COMPONENT)
+  const selectedUser = allUsers.find(user => user.id === grantForm.userId)
 
   // Add this helper function to calculate membership status
   const getMembershipStatus = (membership) => {
@@ -274,11 +291,16 @@ export default function AdminMemberships() {
         {/* Grant Membership Modal */}
         {showGrantModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-black/90 border border-white/10 rounded-2xl p-8 max-w-md w-full mx-4">
+            <div className="bg-black/90 border border-white/10 rounded-2xl p-8 max-w-lg w-full mx-4">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-white">Grant Membership</h3>
                 <button
-                  onClick={() => setShowGrantModal(false)}
+                  onClick={() => {
+                    setShowGrantModal(false)
+                    setUserSearchTerm("")
+                    setShowUserDropdown(false)
+                    setGrantForm({ userId: '', tierName: 'pro', months: 1 })
+                  }}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   <X className="w-6 h-6" />
@@ -286,23 +308,103 @@ export default function AdminMemberships() {
               </div>
               
               <form onSubmit={handleGrantMembership} className="space-y-6">
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Select User
                   </label>
-                  <select
-                    value={grantForm.userId}
-                    onChange={(e) => setGrantForm({...grantForm, userId: e.target.value})}
-                    className="w-full px-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white focus:border-[#39FF14] focus:outline-none"
-                    required
-                  >
-                    <option value="">Choose a user...</option>
-                    {allUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.username} ({user.email})
-                      </option>
-                    ))}
-                  </select>
+                  
+                  {/* Search Input */}
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search users by name or email..."
+                        value={userSearchTerm}
+                        onChange={(e) => {
+                          setUserSearchTerm(e.target.value)
+                          setShowUserDropdown(true)
+                        }}
+                        onFocus={() => setShowUserDropdown(true)}
+                        className="w-full pl-10 pr-4 py-3 bg-black/20 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-[#39FF14] focus:outline-none"
+                      />
+                    </div>
+                    
+                    {/* Selected User Display */}
+                    {selectedUser && (
+                      <div className="mt-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-white font-medium">{selectedUser.username}</p>
+                            <p className="text-gray-400 text-sm">{selectedUser.email}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGrantForm({...grantForm, userId: ''})
+                              setUserSearchTerm("")
+                            }}
+                            className="text-gray-400 hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Dropdown List */}
+                    {showUserDropdown && userSearchTerm && (
+                      <div className="absolute z-10 w-full mt-1 bg-black/90 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {filteredUsersForGrant.length > 0 ? (
+                          filteredUsersForGrant.map(user => (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => {
+                                setGrantForm({...grantForm, userId: user.id})
+                                setUserSearchTerm("")
+                                setShowUserDropdown(false)
+                              }}
+                              className="w-full text-left p-3 hover:bg-white/10 border-b border-gray-700 last:border-b-0 transition-colors"
+                            >
+                              <div>
+                                <p className="text-white font-medium">{user.username}</p>
+                                <p className="text-gray-400 text-sm">{user.email}</p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-3 text-gray-400 text-center">
+                            No users found matching "{userSearchTerm}"
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Show all users when no search term */}
+                  {!userSearchTerm && !selectedUser && (
+                    <div className="mt-2 max-h-40 overflow-y-auto bg-black/20 border border-gray-600 rounded-lg">
+                      <div className="p-2 text-gray-400 text-sm border-b border-gray-600">
+                        All Users ({allUsers.length})
+                      </div>
+                      {allUsers.map(user => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => {
+                            setGrantForm({...grantForm, userId: user.id})
+                          }}
+                          className="w-full text-left p-3 hover:bg-white/10 border-b border-gray-700 last:border-b-0 transition-colors"
+                        >
+                          <div>
+                            <p className="text-white font-medium">{user.username}</p>
+                            <p className="text-gray-400 text-sm">{user.email}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -337,14 +439,19 @@ export default function AdminMemberships() {
                 <div className="flex space-x-4">
                   <button
                     type="button"
-                    onClick={() => setShowGrantModal(false)}
+                    onClick={() => {
+                      setShowGrantModal(false)
+                      setUserSearchTerm("")
+                      setShowUserDropdown(false)
+                      setGrantForm({ userId: '', tierName: 'pro', months: 1 })
+                    }}
                     className="flex-1 px-6 py-3 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={isGranting}
+                    disabled={isGranting || !grantForm.userId}
                     className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
                   >
                     {isGranting ? 'Granting...' : 'Grant Membership'}
@@ -369,7 +476,6 @@ export default function AdminMemberships() {
                   <th className="text-left p-4 text-gray-400 font-medium">Status</th>
                   <th className="text-left p-4 text-gray-400 font-medium">Start Date</th>
                   <th className="text-left p-4 text-gray-400 font-medium">End Date</th>
-                  <th className="text-left p-4 text-gray-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -405,19 +511,7 @@ export default function AdminMemberships() {
                     <td className="p-4 text-gray-300">
                       {membership.expires_at ? new Date(membership.expires_at).toLocaleDateString() : 'N/A'}
                     </td>
-                    <td className="p-4">
-                      <div className="flex space-x-2">
-                        <button className="p-2 hover:bg-blue-900/20 text-blue-400 rounded-lg">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 hover:bg-yellow-900/20 text-yellow-400 rounded-lg">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 hover:bg-red-900/20 text-red-400 rounded-lg">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+
                   </tr>
                 ))}
               </tbody>

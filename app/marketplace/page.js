@@ -134,20 +134,20 @@ export default function MarketplacePage() {
     }
   }
 
-  // Pagination component
+  // Pagination Component
   const PaginationControls = () => {
     const { totalPages, hasMore, hasPrevious } = pagination
     
+    // Don't render pagination if data is still loading or no pagination data
+    if (loading || totalPages === 0) return null
+
     const getPageNumbers = () => {
       const pages = []
-      const maxVisible = 5
       
-      if (totalPages <= maxVisible) {
-        for (let i = 1; i <= totalPages; i++) {
-          pages.push(i)
-        }
+      if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pages.push(i)
       } else {
-        if (currentPage <= 3) {
+        if (currentPage <= 4) {
           for (let i = 1; i <= 4; i++) pages.push(i)
           pages.push('...')
           pages.push(totalPages)
@@ -167,50 +167,55 @@ export default function MarketplacePage() {
       return pages
     }
 
+    // Remove the console.log or add a condition to prevent logging during initial render
+    // console.log("Get: ", getPageNumbers())
+
     if (totalPages <= 1) return null
 
     return (
       <div className="flex items-center justify-center space-x-2 mt-12">
-        {/* Previous Button - Fixed visibility */}
+        {/* Previous Button - Fixed logic */}
         <button
+        disabled={!hasPrevious}
           onClick={() => handlePageChange(currentPage - 1)}
-          disabled={!hasPrevious}
           className="flex items-center px-4 py-2 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-medium hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:bg-gray-900/50 min-w-[100px] justify-center"
         >
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          <span>Previous</span>
+          <ChevronLeft className="z-999 w-4 h-4 mr-1" />
+          <span className="text-white font-medium">Previous</span>
         </button>
 
         {/* Page Numbers */}
         <div className="flex items-center space-x-1">
           {getPageNumbers().map((page, index) => (
             page === '...' ? (
-              <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-400">
+              <span key={`ellipsis-${index}`} className="px-3 py-2 text-white z-9999 font-medium">
                 ...
               </span>
             ) : (
               <button
-                key={page}
+                key={`page-${page}`}
                 onClick={() => handlePageChange(page)}
-                className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 min-w-[40px] ${
+                className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 min-w-[40px] z-999 ${
                   currentPage === page
-                    ? 'bg-[#39FF14] text-black'
+                    ? 'bg-[#39FF14] text-black font-bold'
                     : 'bg-gray-900/50 border border-gray-700 text-white hover:border-[#39FF14] hover:bg-[#39FF14]/10'
                 }`}
               >
-                {page}
+                <span className={currentPage === page ? 'text-black font-bold' : 'text-white font-medium'}>
+                  {page}
+                </span>
               </button>
             )
           ))}
         </div>
 
-        {/* Next Button - Fixed visibility */}
+        {/* Next Button - Fixed logic */}
         <button
+        disabled={!hasMore}
           onClick={() => handlePageChange(currentPage + 1)}
-          disabled={!hasMore}
-          className="flex items-center px-4 py-2 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-medium hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:bg-gray-900/50 min-w-[100px] justify-center"
+          className="flex z-999 items-center px-4 py-2 bg-gray-900/50 border border-gray-700 text-white rounded-xl font-medium hover:border-[#39FF14] hover:bg-[#39FF14]/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:bg-gray-900/50 min-w-[100px] justify-center"
         >
-          <span>Next</span>
+          <span className="text-white font-medium">Next</span>
           <ChevronRight className="w-4 h-4 ml-1" />
         </button>
       </div>

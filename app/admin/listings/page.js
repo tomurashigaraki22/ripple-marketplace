@@ -4,9 +4,11 @@ import { Search, Filter, Eye, CheckCircle, XCircle, Clock, Package } from "lucid
 import AdminLayout from "../components/AdminLayout"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/app/context/AuthContext"
 
 export default function AdminListings() {
   const [listings, setListings] = useState([])
+  const {logout} = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const router = useRouter()
   const [filterStatus, setFilterStatus] = useState("all")
@@ -63,6 +65,7 @@ export default function AdminListings() {
       
       if (response.ok) {
         if (action === "view"){
+          await logout();
           router.push(`/marketplace/${listingId}`)
         }
         fetchListings()

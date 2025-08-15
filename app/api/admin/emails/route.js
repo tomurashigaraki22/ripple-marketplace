@@ -4,6 +4,7 @@ import { sendPromotionalEmail, sendBulkEmails, validateEmail } from '../../../li
 import { verifyAdminAccess } from '../../../utils/auth.js'
 import { promotionalTemplate } from '../../../lib/emailTemplates/promotionalTemplate.js'
 import { newsletterTemplate } from '../../../lib/emailTemplates/newsletterTemplate.js'
+import { logAuditAction, getClientIP, getUserAgent, AUDIT_ACTIONS, TARGET_TYPES } from '../../../utils/auditLogger.js'
 
 // POST - Send promotional emails
 export async function POST(request) {
@@ -182,17 +183,41 @@ export async function POST(request) {
       WHERE id = ?
     `, [successCount, failureCount, campaignId])
 
+    // After successful email sending, add audit logging
+    const emailResult = await sendBulkEmails({
+      recipients: emailList,
+      subject,
+      htmlContent: emailHtml,
+      templateType,
+      scheduledFor
+    })
+
+    // Log audit action
+    await logAuditAction({
+      adminId: authResult.user.id,
+      action: recipients === 'all' ? AUDIT_ACTIONS.BULK_EMAIL_SENT : AUDIT_ACTIONS.EMAIL_SENT,
+      targetType: TARGET_TYPES.EMAIL,
+      targetId: null,
+      details: {
+        templateType,
+        subject,
+        recipientType: recipients,
+        recipientCount: emailList.length,
+        selectedUserIds: recipients === 'selected' ? selectedUserIds : null,
+        scheduledFor,
+        emailResult
+      },
+      ipAddress: getClientIP(request),
+      userAgent: getUserAgent(request)
+    })
+
     return NextResponse.json({
-      success: true,
-      campaignId,
-      totalRecipients: emailList.length,
-      sentCount: successCount,
-      failedCount: failureCount,
-      message: `Email campaign sent to ${successCount} recipients`
+      message: scheduledFor ? 'Email scheduled successfully' : 'Emails sent successfully',
+      result: emailResult
     })
 
   } catch (error) {
-    console.error('Error sending promotional emails:', error)
+    console.error('Error sending emails:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

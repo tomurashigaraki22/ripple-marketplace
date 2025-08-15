@@ -20,7 +20,6 @@ export default function AdminLayout({ children }) {
     { name: 'Escrows', href: '/admin/escrows', icon: Shield },
     { name: 'Emails', href: '/admin/emails', icon: Mail },
     { name: 'Audit Trail', href: '/admin/audit', icon: BarChart3 },
-    { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ]
 

@@ -15,19 +15,19 @@ export async function GET(request) {
 
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // Check if user is admin
+    // Check if user is admin - properly join users and roles tables
     const [users] = await db.query(
-      'SELECT role, role_name FROM users WHERE id = ?',
+      'SELECT u.role_id, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?',
       [decoded.userId]
     );
 
-    if (users.length === 0 || (users[0].role !== 'admin' && users[0].role_name !== 'admin')) {
+    if (users.length === 0 || (users[0].role_id !== 1 && users[0].role_name !== 'admin')) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Get admin settings from database or return defaults
+    // Get admin settings from database or return defaults - FIXED: escaped 'key' with backticks
     const [settingsResult] = await db.query(
-      'SELECT value FROM admin_settings WHERE key = "system_settings"'
+      'SELECT value FROM admin_settings WHERE `key` = "system_settings"'
     );
 
     let settings = {
@@ -95,13 +95,13 @@ export async function PUT(request) {
 
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    // Check if user is admin
+    // Check if user is admin - properly join users and roles tables
     const [users] = await db.query(
-      'SELECT role, role_name FROM users WHERE id = ?',
+      'SELECT u.role_id, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?',
       [decoded.userId]
     );
 
-    if (users.length === 0 || (users[0].role !== 'admin' && users[0].role_name !== 'admin')) {
+    if (users.length === 0 || (users[0].role_id !== 1 && users[0].role_name !== 'admin')) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
@@ -117,7 +117,7 @@ export async function PUT(request) {
       }
     }
 
-    // Save settings to database
+    // Save settings to database - FIXED: escaped 'key' with backticks
     await db.query(
       `INSERT INTO admin_settings (\`key\`, value, updated_at) 
        VALUES ("system_settings", ?, NOW()) 

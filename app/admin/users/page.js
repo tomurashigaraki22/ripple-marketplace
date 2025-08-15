@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Search, Filter, Edit, Trash2, Shield, Crown, Star, Ban, CheckCircle } from "lucide-react"
+import { Search, Filter, Edit, Trash2, Shield, Crown, Star, Ban, CheckCircle, UserPlus, AlertCircle } from "lucide-react"
 import AdminLayout from "../components/AdminLayout"
 
 export default function AdminUsers() {
@@ -8,10 +8,17 @@ export default function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterRole, setFilterRole] = useState("all")
   const [filterMembership, setFilterMembership] = useState("all")
+  const [notification, setNotification] = useState({ show: false, type: '', message: '' })
+  const [confirmAction, setConfirmAction] = useState({ show: false, userId: null, action: '', userName: '' })
 
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  const showNotification = (type, message) => {
+    setNotification({ show: true, type, message })
+    setTimeout(() => setNotification({ show: false, type: '', message: '' }), 5000)
+  }
 
   const fetchUsers = async () => {
     try {
@@ -22,7 +29,7 @@ export default function AdminUsers() {
         return
       }
 
-      const response = await fetch('/api/admin/users', {
+      const response = await fetch('/api/admin/users?all=true', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -39,11 +46,12 @@ export default function AdminUsers() {
       setUsers(data.users || [])
     } catch (error) {
       console.error('Failed to fetch users:', error)
-      setUsers([]) // Ensure users is always an array
+      setUsers([])
+      showNotification('error', 'Failed to fetch users')
     }
   }
 
-  const handleUserAction = async (userId, action) => {
+  const handleUserAction = async (userId, action, additionalData = {}) => {
     try {
       const token = localStorage.getItem('authToken')
       if (!token) {
@@ -52,13 +60,15 @@ export default function AdminUsers() {
         return
       }
 
+      const requestBody = { action, ...additionalData }
+
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ action })
+        body: JSON.stringify(requestBody)
       })
       
       if (response.status === 401) {
@@ -69,14 +79,57 @@ export default function AdminUsers() {
       
       if (response.ok) {
         fetchUsers()
+        const actionMessages = {
+          'suspend': 'User suspended successfully',
+          'activate': 'User activated successfully',
+          'delete': 'User deleted successfully',
+          'edit': 'User updated successfully'
+        }
+        showNotification('success', actionMessages[action] || 'Action completed successfully')
+      } else {
+        const errorData = await response.json()
+        showNotification('error', errorData.error || 'Action failed')
       }
     } catch (error) {
       console.error('Failed to update user:', error)
+      showNotification('error', 'Failed to update user')
     }
   }
 
+  const handleRoleUpgrade = (userId, userName) => {
+    setConfirmAction({
+      show: true,
+      userId,
+      action: 'upgrade_to_admin',
+      userName
+    })
+  }
+
+  const confirmRoleUpgrade = async () => {
+    await handleUserAction(confirmAction.userId, 'edit', { role: 'admin' })
+    setConfirmAction({ show: false, userId: null, action: '', userName: '' })
+  }
+
+  const confirmUserAction = (userId, action, userName) => {
+    setConfirmAction({
+      show: true,
+      userId,
+      action,
+      userName
+    })
+  }
+
+  const executeConfirmedAction = async () => {
+    const { userId, action } = confirmAction
+    if (action === 'upgrade_to_admin') {
+      await confirmRoleUpgrade()
+    } else {
+      await handleUserAction(userId, action)
+    }
+    setConfirmAction({ show: false, userId: null, action: '', userName: '' })
+  }
+
   const filteredUsers = Array.isArray(users) ? users.filter(user => {
-    // Ensure user object exists and has required properties
     if (!user || !user.username || !user.email) return false
     
     const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -94,9 +147,70 @@ export default function AdminUsers() {
     }
   }
 
+  const getActionMessage = (action, userName) => {
+    switch (action) {
+      case 'upgrade_to_admin':
+        return `Are you sure you want to upgrade ${userName} to admin? This will give them full administrative privileges.`
+      case 'suspend':
+        return `Are you sure you want to suspend ${userName}?`
+      case 'activate':
+        return `Are you sure you want to activate ${userName}?`
+      case 'delete':
+        return `Are you sure you want to delete ${userName}? This action cannot be undone.`
+      default:
+        return `Are you sure you want to perform this action on ${userName}?`
+    }
+  }
+
   return (
     <AdminLayout>
       <div className="space-y-6">
+        {/* Notification */}
+        {notification.show && (
+          <div className={`fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 rounded-lg shadow-lg ${
+            notification.type === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
+            'bg-red-500/20 text-red-400 border border-red-500/30'
+          }`}>
+            {notification.type === 'success' ? 
+              <CheckCircle className="w-5 h-5" /> : 
+              <AlertCircle className="w-5 h-5" />
+            }
+            <span>{notification.message}</span>
+          </div>
+        )}
+
+        {/* Confirmation Modal */}
+        {confirmAction.show && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-black/90 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-white mb-4">Confirm Action</h3>
+              <p className="text-gray-300 mb-6">
+                {getActionMessage(confirmAction.action, confirmAction.userName)}
+              </p>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => setConfirmAction({ show: false, userId: null, action: '', userName: '' })}
+                  className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeConfirmedAction}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                    confirmAction.action === 'delete' ? 
+                    'bg-red-600 hover:bg-red-700 text-white' :
+                    confirmAction.action === 'upgrade_to_admin' ?
+                    'bg-gradient-to-r from-[#39FF14] to-cyan-400 text-black hover:shadow-lg' :
+                    'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -212,23 +326,33 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
+                        {/* Upgrade to Admin Button */}
+                        {user.role !== 'admin' && (
+                          <button
+                            onClick={() => handleRoleUpgrade(user.id, user.username)}
+                            className="text-gray-400 hover:text-[#39FF14] transition-colors"
+                            title="Upgrade to Admin"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                          </button>
+                        )}
+                        
+                        {/* Suspend/Activate Button */}
                         <button
-                          onClick={() => handleUserAction(user.id, 'edit')}
-                          className="text-gray-400 hover:text-[#39FF14] transition-colors"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleUserAction(user.id, user.status === 'active' ? 'suspend' : 'activate')}
+                          onClick={() => confirmUserAction(user.id, user.status === 'active' ? 'suspend' : 'activate', user.username)}
                           className={`transition-colors ${
                             user.status === 'active' ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-green-400'
                           }`}
+                          title={user.status === 'active' ? 'Suspend User' : 'Activate User'}
                         >
                           {user.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
+                        
+                        {/* Delete Button */}
                         <button
-                          onClick={() => handleUserAction(user.id, 'delete')}
+                          onClick={() => confirmUserAction(user.id, 'delete', user.username)}
                           className="text-gray-400 hover:text-red-400 transition-colors"
+                          title="Delete User"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

@@ -213,6 +213,27 @@ export async function initializeDatabase() {
       ) COLLATE=utf8mb4_general_ci
     `;
 
+    // Add this after the createAdminSettingsTable
+    const createAuditTrailTable = `
+      CREATE TABLE IF NOT EXISTS audit_trail (
+        id VARCHAR(36) PRIMARY KEY,
+        admin_id VARCHAR(36) NOT NULL,
+        action VARCHAR(100) NOT NULL,
+        target_type VARCHAR(50) NOT NULL,
+        target_id VARCHAR(36),
+        details JSON,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_admin_id (admin_id),
+        INDEX idx_action (action),
+        INDEX idx_target_type (target_type),
+        INDEX idx_target_id (target_id),
+        INDEX idx_created_at (created_at)
+      ) COLLATE=utf8mb4_general_ci
+    `;
+
     // Execute table creation queries
     await db.query(createRolesTable);
     await db.query(createMembershipTiersTable);
@@ -390,3 +411,5 @@ const createAuctionPaymentsTable = `
 await updateListingsTableForAuctions();
 await db.query(createBidsTable);
 await db.query(createAuctionPaymentsTable);
+// Add this line after the other table creation queries
+// await db.query(createAuditTrailTable);

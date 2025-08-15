@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '../../../../lib/db.js'
 import { verifyAdminToken } from '../../middleware.js'
+import { logAuditAction, getClientIP, getUserAgent, AUDIT_ACTIONS, TARGET_TYPES } from '../../../../utils/auditLogger.js'
 
 // GET - Fetch specific listing details
 export async function GET(request, { params }) {
@@ -94,6 +95,20 @@ export async function PATCH(request, { params }) {
         )
       }
 
+      // Log audit action for viewing
+      await logAuditAction({
+        adminId: authResult.user.id,
+        action: AUDIT_ACTIONS.LISTING_VIEWED,
+        targetType: TARGET_TYPES.LISTING,
+        targetId: id,
+        details: {
+          listingTitle: listings[0].title,
+          seller: listings[0].seller
+        },
+        ipAddress: getClientIP(request),
+        userAgent: getUserAgent(request)
+      })
+
       const listing = listings[0]
       const formattedListing = {
         ...listing,
@@ -107,9 +122,12 @@ export async function PATCH(request, { params }) {
     // Handle approve/reject actions
     const newStatus = action === 'approve' ? 'approved' : 'rejected'
 
-    // Check if listing exists
+    // Check if listing exists and get details for audit
     const [existingListings] = await db.query(
-      'SELECT status FROM listings WHERE id = ?',
+      `SELECT l.status, l.title, u.username as seller 
+       FROM listings l 
+       JOIN users u ON l.user_id = u.id 
+       WHERE l.id = ?`,
       [id]
     )
 
@@ -120,11 +138,31 @@ export async function PATCH(request, { params }) {
       )
     }
 
+    const listing = existingListings[0]
+    const oldStatus = listing.status
+
     // Update listing status
     await db.query(
       'UPDATE listings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [newStatus, id]
     )
+
+    // Log audit action
+    await logAuditAction({
+      adminId: authResult.user.id,
+      action: action === 'approve' ? AUDIT_ACTIONS.LISTING_APPROVED : AUDIT_ACTIONS.LISTING_REJECTED,
+      targetType: TARGET_TYPES.LISTING,
+      targetId: id,
+      details: {
+        listingTitle: listing.title,
+        seller: listing.seller,
+        oldStatus,
+        newStatus,
+        action
+      },
+      ipAddress: getClientIP(request),
+      userAgent: getUserAgent(request)
+    })
 
     return NextResponse.json({
       message: `Listing ${action}d successfully`,
