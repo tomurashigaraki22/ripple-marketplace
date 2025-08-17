@@ -99,6 +99,11 @@ export default function ProductDetailPage() {
   const router = useRouter()
   const [calculatedAmount, setCalculatedAmount] = useState(0)
   const params = useParams()
+  
+  // Add state for image modal
+  const [showImageModal, setShowImageModal] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
   // Add authentication check
   useEffect(() => {
@@ -418,6 +423,28 @@ export default function ProductDetailPage() {
     
     return 'Unable to process purchase at this time. Please try again later.';
   };
+
+  // Add function to handle image click
+  const handleImageClick = (imageUrl, index) => {
+    setSelectedImage(imageUrl)
+    setSelectedImageIndex(index)
+    setShowImageModal(true)
+  }
+
+  // Add function to navigate between images in modal
+  const navigateImage = (direction) => {
+    if (!listing?.images || listing.images.length <= 1) return
+    
+    let newIndex
+    if (direction === 'next') {
+      newIndex = selectedImageIndex < listing.images.length - 1 ? selectedImageIndex + 1 : 0
+    } else {
+      newIndex = selectedImageIndex > 0 ? selectedImageIndex - 1 : listing.images.length - 1
+    }
+    
+    setSelectedImageIndex(newIndex)
+    setSelectedImage(listing.images[newIndex])
+  }
 
   // Update connected wallets using the same method as membership page
   useEffect(() => {
@@ -1253,7 +1280,10 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Image Section - Fixed with object-contain */}
           <div className="space-y-6">
-            <div className="card-glow rounded-lg overflow-hidden relative w-full h-96 bg-gray-900">
+            <div 
+              className="card-glow rounded-lg overflow-hidden relative w-full h-96 bg-gray-900 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => handleImageClick(listing.images?.[0] || '/placeholder-image.jpg', 0)}
+            >
               <Image
                 src={listing.images?.[0] || '/placeholder-image.jpg'}
                 alt={listing.title}
@@ -1267,7 +1297,11 @@ export default function ProductDetailPage() {
             {listing.images && listing.images.length > 1 && (
               <div className="grid grid-cols-4 gap-4">
                 {listing.images.slice(1, 5).map((image, index) => (
-                  <div key={index} className="relative h-20 rounded-lg overflow-hidden bg-gray-900">
+                  <div 
+                    key={index} 
+                    className="relative h-20 rounded-lg overflow-hidden bg-gray-900 cursor-pointer hover:opacity-90 transition-opacity border-2 border-transparent hover:border-[#39FF14]/50"
+                    onClick={() => handleImageClick(image, index + 1)}
+                  >
                     <Image
                       src={image}
                       alt={`${listing.title} ${index + 2}`}
@@ -1630,6 +1664,71 @@ export default function ProductDetailPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-4xl max-h-full w-full h-full flex items-center justify-center">
+            {/* Close button */}
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Previous button */}
+            {listing.images && listing.images.length > 1 && (
+              <button
+                onClick={() => navigateImage('prev')}
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+
+            {/* Next button */}
+            {listing.images && listing.images.length > 1 && (
+              <button
+                onClick={() => navigateImage('next')}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+
+            {/* Main image */}
+            <div className="relative w-full h-full max-w-3xl max-h-[80vh]">
+              <Image
+                src={selectedImage}
+                alt={`${listing.title} - Image ${selectedImageIndex + 1}`}
+                fill
+                className="object-contain"
+                quality={100}
+              />
+            </div>
+
+            {/* Image counter */}
+            {listing.images && listing.images.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                {selectedImageIndex + 1} / {listing.images.length}
+              </div>
+            )}
+          </div>
+
+          {/* Click outside to close */}
+          <div 
+            className="absolute inset-0 -z-10" 
+            onClick={() => setShowImageModal(false)}
+          />
         </div>
       )}
 

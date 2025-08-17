@@ -224,7 +224,6 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Clean Header Section */}
       <div className="bg-black border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
@@ -239,9 +238,7 @@ export default function MarketplacePage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Modern Search and Filter Section */}
         <div className="bg-gray-900/50 backdrop-blur-sm rounded-2xl p-6 mb-8 border border-gray-800">
-          {/* Search Bar */}
           <div className="mb-6">
             <div className="relative max-w-2xl mx-auto">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -255,9 +252,7 @@ export default function MarketplacePage() {
             </div>
           </div>
 
-          {/* Filter Controls */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Chain Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Blockchain</label>
               <select
@@ -273,7 +268,6 @@ export default function MarketplacePage() {
               </select>
             </div>
 
-            {/* Category Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
               <select
@@ -289,7 +283,6 @@ export default function MarketplacePage() {
               </select>
             </div>
 
-            {/* Item Type Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Type</label>
               <select
@@ -305,7 +298,6 @@ export default function MarketplacePage() {
               </select>
             </div>
 
-            {/* Sort Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Sort By</label>
               <select
@@ -320,7 +312,6 @@ export default function MarketplacePage() {
               </select>
             </div>
 
-            {/* View Mode Toggle */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">View</label>
               <div className="flex bg-black/50 border border-gray-700 rounded-xl overflow-hidden">
